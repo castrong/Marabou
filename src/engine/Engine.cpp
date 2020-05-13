@@ -99,7 +99,7 @@ bool Engine::solve( unsigned timeoutInSeconds )
     SignalHandler::getInstance()->registerClient( this );
 
     storeInitialEngineState();
-    
+
     printf("Engine::Solving SAT Problem");
 
     if ( _verbosity > 0 )
@@ -358,7 +358,7 @@ bool Engine::optimize( unsigned timeoutInSeconds )
             if ( !_smtCore.popSplit() )
             {
                 printf("\nWe've explored the full tree with opt val (print 1): %f\n", _bestOptValSoFar);
-                // TODO (Chris Strong): Rethink how we want to return 
+                // TODO (Chris Strong): Rethink how we want to return
                 _exitCode = Engine::SAT;
                 return true;
             }
@@ -471,7 +471,7 @@ bool Engine::optimize( unsigned timeoutInSeconds )
                     if ( !_smtCore.popSplit() )
                     {
                         printf("\nWe've explored the full tree with opt val (print 1): %f\n", _bestOptValSoFar);
-                        // TODO (Chris Strong): Rethink how we want to return 
+                        // TODO (Chris Strong): Rethink how we want to return
                         _exitCode = Engine::SAT;
                         return true;
                     }
@@ -514,7 +514,7 @@ bool Engine::optimize( unsigned timeoutInSeconds )
                     if (_bestOptValSoFar < curOptValue)
                     {
                         _bestOptValSoFar = curOptValue;
-                        
+
                         // Update the best input we've seen so far
                         updateBestSolutionSoFar();
 
@@ -524,7 +524,7 @@ bool Engine::optimize( unsigned timeoutInSeconds )
                     if( !_smtCore.popSplit() )
                     {
                         printf("\nWe've explored the full tree with opt val (print 2): %f\n", _bestOptValSoFar);
-                        // TODO (Chris Strong): Rethink how we want to return 
+                        // TODO (Chris Strong): Rethink how we want to return
                         _exitCode = Engine::SAT;
                         return true;
                     }
@@ -570,7 +570,7 @@ bool Engine::optimize( unsigned timeoutInSeconds )
                     if( !_smtCore.popSplit() )
                     {
                         printf("\nWe've explored the full tree with opt val (print 3): %f\n", _bestOptValSoFar);
-                        // TODO (Chris Strong): Rethink how we want to return 
+                        // TODO (Chris Strong): Rethink how we want to return
                         _exitCode = Engine::SAT;
                         return true;
                     }
@@ -618,12 +618,7 @@ bool Engine::optimize( unsigned timeoutInSeconds )
             {
                 if ( _verbosity > 0 )
                 {
-<<<<<<< HEAD
-
-                    printf( "\nEngine::solve: UNSAT query\n" );
-=======
                     printf( "\nEngine::solve: unsat query\n" );
->>>>>>> NeuralNetworkVerification/master
                     _statistics.print();
                 }
                 // switched to SAT / true b/c as long as the original isnt infeasible there will always be a satisfying solution?
@@ -1446,7 +1441,7 @@ bool Engine::processInputQuery( InputQuery &inputQuery, bool preprocess )
         // The equations have changed, recreate the constraint matrix
         delete[] constraintMatrix;
         constraintMatrix = createConstraintMatrix();
-        
+
         initializeNetworkLevelReasoning();
         initializeTableau( constraintMatrix, initialBasis );
 
@@ -1511,7 +1506,7 @@ void Engine::updateBestSolutionSoFar()
         {
             _bestSolutionSoFar[i] = _tableau->getValue( i );
 
-        }       
+        }
 
     }
 }

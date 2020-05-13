@@ -250,25 +250,6 @@ InputQuery &InputQuery::operator=( const InputQuery &other )
         }
     }
 
-<<<<<<< HEAD
-    if ( other._sbt )
-    {
-        if ( !_sbt )
-            _sbt = new SymbolicBoundTightener;
-        other._sbt->storeIntoOther( *_sbt );
-    }
-    else
-    {
-        if ( _sbt )
-        {
-            printf("Deleting sbt here\n");
-            delete _sbt;
-            _sbt = NULL;
-        }
-    }
-
-=======
->>>>>>> NeuralNetworkVerification/master
     return *this;
 }
 
@@ -445,11 +426,11 @@ List<unsigned> InputQuery::getOutputVariables() const
     return result;
 }
 
-<<<<<<< HEAD
 unsigned InputQuery::getOptimizationVariable() const
 {
     return _optimizationVariable;
-=======
+}
+
 void InputQuery::printAllBounds() const
 {
     printf( "InputQuery: Dumping all bounds\n" );
@@ -471,7 +452,6 @@ void InputQuery::printAllBounds() const
     }
 
     printf( "\n\n" );
->>>>>>> NeuralNetworkVerification/master
 }
 
 void InputQuery::printInputOutputBounds() const
@@ -523,15 +503,6 @@ void InputQuery::dump() const
     }
 }
 
-<<<<<<< HEAD
-void InputQuery::setSymbolicBoundTightener( SymbolicBoundTightener *sbt )
-{
-    printf("setting symbolic bound tightener\n");
-    _sbt = sbt;
-}
-
-=======
->>>>>>> NeuralNetworkVerification/master
 void InputQuery::adjustInputOutputMapping( const Map<unsigned, unsigned> &oldIndexToNewIndex,
                                            const Map<unsigned, unsigned> &mergedVariables )
 {
@@ -542,17 +513,17 @@ void InputQuery::adjustInputOutputMapping( const Map<unsigned, unsigned> &oldInd
     // Input variables
     for ( const auto &it : _inputIndexToVariable )
     {
-        if ( mergedVariables.exists( it.second ) ) 
+        if ( mergedVariables.exists( it.second ) )
         {
-            if (!_optimize) 
+            if (!_optimize)
             {
-            
-                throw MarabouError( MarabouError::MERGED_OUTPUT_VARIABLE, 
+
+                throw MarabouError( MarabouError::MERGED_OUTPUT_VARIABLE,
                                         Stringf( "Output variable %u has been merged\n", it.second ).ascii() );
             }
             else
             {
-            
+
             // Why do we need the count?
             printf("merged var at it.second is: %d \n", mergedVariables[it.second]);
 
@@ -564,9 +535,9 @@ void InputQuery::adjustInputOutputMapping( const Map<unsigned, unsigned> &oldInd
                 finalMergeTarget = mergedVariables[finalMergeTarget];
             }
             printf("Final merge target is: %d \n", finalMergeTarget);
-            newInputIndexToVariable[it.first] = finalMergeTarget; 
+            newInputIndexToVariable[it.first] = finalMergeTarget;
             ++currentIndex;
-            
+
             }
         }
 
@@ -591,15 +562,15 @@ void InputQuery::adjustInputOutputMapping( const Map<unsigned, unsigned> &oldInd
     {
         if ( mergedVariables.exists( it.second ) )
         {
-            if (!_optimize) 
+            if (!_optimize)
             {
-            
-                throw MarabouError( MarabouError::MERGED_OUTPUT_VARIABLE, 
+
+                throw MarabouError( MarabouError::MERGED_OUTPUT_VARIABLE,
                                         Stringf( "Output variable %u has been merged\n", it.second ).ascii() );
             }
             else
             {
-            
+
                 // Why do we need the count? INDEXING FEELS WRONG HERE?????
                 printf("merged var at it.second is: %d \n", mergedVariables[it.second]);
 
@@ -608,7 +579,7 @@ void InputQuery::adjustInputOutputMapping( const Map<unsigned, unsigned> &oldInd
                 while ( mergedVariables.exists( finalMergeTarget ) )
                     finalMergeTarget = mergedVariables[finalMergeTarget];
                 printf("Final merge target is: %d \n", finalMergeTarget);
-                newOutputIndexToVariable[currentIndex] = finalMergeTarget; 
+                newOutputIndexToVariable[currentIndex] = finalMergeTarget;
                 ++currentIndex;
 
             }
@@ -648,7 +619,7 @@ void InputQuery::adjustInputOutputMapping( const Map<unsigned, unsigned> &oldInd
             while ( mergedVariables.exists( finalMergeTarget ) )
                 finalMergeTarget = mergedVariables[finalMergeTarget];
             printf("Final merge target is: %d \n", finalMergeTarget);
-            _optimizationVariable = finalMergeTarget; 
+            _optimizationVariable = finalMergeTarget;
         }
 
 
