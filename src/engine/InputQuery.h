@@ -34,6 +34,9 @@ public:
       Methods for setting and getting the input part of the query
     */
     void setNumberOfVariables( unsigned numberOfVariables );
+    void setOptimize( bool optimize );
+    bool getOptimize();
+
     void setLowerBound( unsigned variable, double bound );
     void setUpperBound( unsigned variable, double bound );
 
@@ -58,12 +61,15 @@ public:
     */
     void markInputVariable( unsigned variable, unsigned inputIndex );
     void markOutputVariable( unsigned variable, unsigned inputIndex );
+    void markOptimizationVariable( unsigned variable );
     unsigned inputVariableByIndex( unsigned index ) const;
     unsigned outputVariableByIndex( unsigned index ) const;
     unsigned getNumInputVariables() const;
     unsigned getNumOutputVariables() const;
     List<unsigned> getInputVariables() const;
     List<unsigned> getOutputVariables() const;
+    unsigned getOptimizationVariable() const;
+
 
     /*
       Methods for setting and getting the solution.
@@ -134,6 +140,9 @@ public:
 
 private:
     unsigned _numberOfVariables;
+    bool _optimize;
+    unsigned _optimizationVariable;
+
     List<Equation> _equations;
     Map<unsigned, double> _lowerBounds;
     Map<unsigned, double> _upperBounds;
@@ -155,6 +164,7 @@ public:
     Map<unsigned, unsigned> _inputIndexToVariable;
     Map<unsigned, unsigned> _variableToOutputIndex;
     Map<unsigned, unsigned> _outputIndexToVariable;
+
 
     /*
       An object that knows the topology of the network being checked,

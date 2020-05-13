@@ -120,8 +120,8 @@ class MarabouNetworkNNet(MarabouNetwork.MarabouNetwork):
 
         return sbt
 
-    def getMarabouQuery(self):
-        ipq = super(MarabouNetworkNNet, self).getMarabouQuery()
+    def getMarabouQuery(self, optimize = False):
+        ipq = super(MarabouNetworkNNet, self).getMarabouQuery(optimize)
         ipq.setSymbolicBoundTightener(self.sbt)
         return ipq
 

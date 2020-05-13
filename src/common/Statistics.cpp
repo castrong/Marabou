@@ -16,6 +16,7 @@
 #include "FloatUtils.h"
 #include "Statistics.h"
 #include "TimeUtils.h"
+#include <math.h>
 
 Statistics::Statistics()
     : _numMainLoopIterations( 0 )
@@ -33,6 +34,7 @@ Statistics::Statistics()
     , _numConstraintFixingSteps( 0 )
     , _currentStackDepth( 0 )
     , _maxStackDepth( 0 )
+    , _percentDone( 0 )
     , _numSplits( 0 )
     , _numPops( 0 )
     , _numVisitedTreeStates( 1 )
@@ -657,11 +659,24 @@ unsigned long long Statistics::getTotalTime() const
         _totalTimePrecisionRestoration +
         _totalTimeConstraintMatrixBoundTighteningMicro +
         _totalTimeApplyingStoredTighteningsMicro +
-        _totalTimeSmtCoreMicro;
+        _totalTimeSmtCoreMicro +
+        _totalTimePerformingSymbolicBoundTightening;
 
     // Total is in micro seconds, and we need to return milliseconds
     return total / 1000;
 }
+
+long double Statistics::getPercentDone() const
+{
+    return _percentDone;
+}
+
+void Statistics::incPercentDone(unsigned depth)
+{
+    _percentDone += pow(2, 1 - ((int)depth + 1));
+    printf("Depth popped: %d, Percent Done: %.1Lf%%\n", depth, 100.0 * _percentDone);
+}
+
 
 void Statistics::timeout()
 {

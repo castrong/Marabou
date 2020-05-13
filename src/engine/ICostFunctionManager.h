@@ -49,6 +49,15 @@ public:
     virtual bool costFunctionInvalid() const = 0;
     virtual bool costFunctionJustComputed() const = 0;
     virtual void invalidateCostFunction() = 0;
+
+    /*
+      Set _optimize and _optimizationVariable
+    */
+    virtual void setOptimize( bool optimize ) = 0;
+    virtual void setOptimizationVariable( unsigned variable ) = 0;
+    virtual bool getOptimize() = 0;
+    virtual unsigned getOptimizationVariable() = 0;
+
 };
 
 #endif // __ICostFunctionManager_h__

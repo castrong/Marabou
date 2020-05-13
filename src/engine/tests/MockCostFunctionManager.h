@@ -129,6 +129,32 @@ public:
     void invalidateCostFunction()
     {
     }
+
+    /*
+      Set _optimize and _optimizationVariable
+    */
+    void setOptimize( bool optimize ) 
+    {
+        TS_ASSERT(optimize || !optimize);
+    }
+    void setOptimizationVariable( unsigned variable )
+    {
+        TS_ASSERT(variable >= 0);
+    }
+    bool getOptimize()
+    {
+        return false;
+    }
+    unsigned getOptimizationVariable()
+    {
+        return -1;
+    }
+
+    void updateLinearSolved()
+    {
+        
+    }
+
 };
 
 #endif // __MockCostFunctionManager_h__

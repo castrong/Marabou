@@ -46,6 +46,15 @@ void InputQuery::setNumberOfVariables( unsigned numberOfVariables )
 {
     _numberOfVariables = numberOfVariables;
 }
+void InputQuery::setOptimize( bool optimize )
+{
+    _optimize = optimize;
+}
+bool InputQuery::getOptimize()
+{
+    return _optimize;
+}
+
 
 void InputQuery::setLowerBound( unsigned variable, double bound )
 {
@@ -224,10 +233,14 @@ InputQuery &InputQuery::operator=( const InputQuery &other )
     _inputIndexToVariable = other._inputIndexToVariable;
     _variableToOutputIndex = other._variableToOutputIndex;
     _outputIndexToVariable = other._outputIndexToVariable;
+    _optimize = other._optimize;
+    _optimizationVariable = other._optimizationVariable;
 
     freeConstraintsIfNeeded();
+
     for ( const auto &constraint : other._plConstraints )
         _plConstraints.append( constraint->duplicateConstraint() );
+
 
     if ( other._networkLevelReasoner )
     {
@@ -254,6 +267,7 @@ InputQuery &InputQuery::operator=( const InputQuery &other )
     {
         if ( _sbt )
         {
+            printf("Deleting sbt here\n");
             delete _sbt;
             _sbt = NULL;
         }
@@ -391,6 +405,11 @@ void InputQuery::markOutputVariable( unsigned variable, unsigned outputIndex )
     _outputIndexToVariable[outputIndex] = variable;
 }
 
+void InputQuery::markOptimizationVariable( unsigned variable )
+{
+    _optimizationVariable = variable;
+}
+
 unsigned InputQuery::inputVariableByIndex( unsigned index ) const
 {
     ASSERT( _inputIndexToVariable.exists( index ) );
@@ -429,6 +448,11 @@ List<unsigned> InputQuery::getOutputVariables() const
         result.append( pair.first );
 
     return result;
+}
+
+unsigned InputQuery::getOptimizationVariable() const
+{
+    return _optimizationVariable;
 }
 
 void InputQuery::printInputOutputBounds() const
@@ -482,21 +506,47 @@ void InputQuery::dump() const
 
 void InputQuery::setSymbolicBoundTightener( SymbolicBoundTightener *sbt )
 {
+    printf("setting symbolic bound tightener\n");
     _sbt = sbt;
 }
 
 void InputQuery::adjustInputOutputMapping( const Map<unsigned, unsigned> &oldIndexToNewIndex,
                                            const Map<unsigned, unsigned> &mergedVariables )
 {
+
     Map<unsigned, unsigned> newInputIndexToVariable;
     unsigned currentIndex = 0;
 
     // Input variables
     for ( const auto &it : _inputIndexToVariable )
     {
-        if ( mergedVariables.exists( it.second ) )
-            throw MarabouError( MarabouError::MERGED_INPUT_VARIABLE,
-                                 Stringf( "Input variable %u has been merged\n", it.second ).ascii() );
+        if ( mergedVariables.exists( it.second ) ) 
+        {
+            if (!_optimize) 
+            {
+            
+                throw MarabouError( MarabouError::MERGED_OUTPUT_VARIABLE, 
+                                        Stringf( "Output variable %u has been merged\n", it.second ).ascii() );
+            }
+            else
+            {
+            
+            // Why do we need the count?
+            printf("merged var at it.second is: %d \n", mergedVariables[it.second]);
+
+            // In case of a chained merging, go all the way to the final target
+            unsigned finalMergeTarget = mergedVariables[it.second];
+            while ( mergedVariables.exists( finalMergeTarget ) )
+            {
+                printf("Current merge target is: %d\n", finalMergeTarget);
+                finalMergeTarget = mergedVariables[finalMergeTarget];
+            }
+            printf("Final merge target is: %d \n", finalMergeTarget);
+            newInputIndexToVariable[it.first] = finalMergeTarget; 
+            ++currentIndex;
+            
+            }
+        }
 
         if ( oldIndexToNewIndex.exists( it.second ) )
         {
@@ -504,6 +554,7 @@ void InputQuery::adjustInputOutputMapping( const Map<unsigned, unsigned> &oldInd
             ++currentIndex;
         }
     }
+
     _inputIndexToVariable = newInputIndexToVariable;
 
     _variableToInputIndex.clear();
@@ -517,12 +568,36 @@ void InputQuery::adjustInputOutputMapping( const Map<unsigned, unsigned> &oldInd
     for ( const auto &it : _outputIndexToVariable )
     {
         if ( mergedVariables.exists( it.second ) )
-            throw MarabouError( MarabouError::MERGED_OUTPUT_VARIABLE,
-                                 Stringf( "Output variable %u has been merged\n", it.second ).ascii() );
+        {
+            if (!_optimize) 
+            {
+            
+                throw MarabouError( MarabouError::MERGED_OUTPUT_VARIABLE, 
+                                        Stringf( "Output variable %u has been merged\n", it.second ).ascii() );
+            }
+            else
+            {
+            
+                // Why do we need the count? INDEXING FEELS WRONG HERE?????
+                printf("merged var at it.second is: %d \n", mergedVariables[it.second]);
+
+                // In case of a chained merging, go all the way to the final target
+                unsigned finalMergeTarget = mergedVariables[it.second];
+                while ( mergedVariables.exists( finalMergeTarget ) )
+                    finalMergeTarget = mergedVariables[finalMergeTarget];
+                printf("Final merge target is: %d \n", finalMergeTarget);
+                newOutputIndexToVariable[currentIndex] = finalMergeTarget; 
+                ++currentIndex;
+
+            }
+        }
 
         if ( oldIndexToNewIndex.exists( it.second ) )
         {
+            // Could lthis be it.first instead of currentIndex?
             newOutputIndexToVariable[currentIndex] = oldIndexToNewIndex[it.second];
+            // why was current index only incrementing here??? What do we expect newOutputIndexToVariable to hold?
+            // Indices for all of the output variables? or just the changed ones?
             ++currentIndex;
         }
     }
@@ -531,6 +606,37 @@ void InputQuery::adjustInputOutputMapping( const Map<unsigned, unsigned> &oldInd
     _variableToOutputIndex.clear();
     for ( auto it : _outputIndexToVariable )
         _variableToOutputIndex[it.second] = it.first;
+
+
+    // Optimization variable
+    if (_optimize)
+    {
+
+        //TODO (Chris Strong): check this function - also if it both merges and re-indexes will this change things?
+        //printf("old to new of opt var: %d old, %d new", _optimizationVariable, oldIndexToNewIndex[_optimizationVariable]);
+        if ( mergedVariables.exists( _optimizationVariable ) )
+        {
+            printf("\n!!!!!!!!!!!Merging optimization variable!!!!!!!!!!\n");
+
+            // Why do we need the count?
+            printf("merged var at optimvar: %d is %d \n", _optimizationVariable, mergedVariables[_optimizationVariable]);
+
+            // In case of a chained merging, go all the way to the final target
+            unsigned finalMergeTarget = mergedVariables[_optimizationVariable];
+            while ( mergedVariables.exists( finalMergeTarget ) )
+                finalMergeTarget = mergedVariables[finalMergeTarget];
+            printf("Final merge target is: %d \n", finalMergeTarget);
+            _optimizationVariable = finalMergeTarget; 
+        }
+
+
+        if ( oldIndexToNewIndex.exists( _optimizationVariable ) )
+        {
+            printf("\n!!!!!!!!!!!Reindexing optimization variable from %d to %d!!!!!!!!!!\n", _optimizationVariable, oldIndexToNewIndex[_optimizationVariable]);
+
+            _optimizationVariable = oldIndexToNewIndex[_optimizationVariable];
+        }
+    }
 }
 
 void InputQuery::setNetworkLevelReasoner( NetworkLevelReasoner *nlr )

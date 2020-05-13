@@ -179,6 +179,11 @@ void SymbolicBoundTightener::setNumberOfLayers( unsigned layers )
 
     std::fill_n( _layerSizes, layers, 0 );
 }
+unsigned SymbolicBoundTightener::getNumberOfLayers()
+{
+    return _numberOfLayers;
+}
+
 
 void SymbolicBoundTightener::setLayerSize( unsigned layer, unsigned layerSize )
 {
@@ -206,7 +211,6 @@ void SymbolicBoundTightener::allocateWeightAndBiasSpace()
         _weights[i]._columns = _layerSizes[i+1];
         _weights[i]._positiveValues = new double[_weights[i]._rows * _weights[i]._columns];
         _weights[i]._negativeValues = new double[_weights[i]._rows * _weights[i]._columns];
-
         std::fill_n( _weights[i]._positiveValues, _weights[i]._rows * _weights[i]._columns, 0 );
         std::fill_n( _weights[i]._negativeValues, _weights[i]._rows * _weights[i]._columns, 0 );
     }
@@ -838,12 +842,15 @@ const Map<SymbolicBoundTightener::NodeIndex, unsigned> &SymbolicBoundTightener::
 
 void SymbolicBoundTightener::storeIntoOther( SymbolicBoundTightener &other ) const
 {
+    printf("Storing into other\n");
     other.freeMemoryIfNeeded();
-
     other.setNumberOfLayers( _numberOfLayers );
 
+    printf("Num layers: %d\n", _numberOfLayers);
     for ( unsigned i = 0; i < _numberOfLayers; ++i )
+    {
         other.setLayerSize( i, _layerSizes[i] );
+    }
 
     other.allocateWeightAndBiasSpace();
 
@@ -863,6 +870,8 @@ void SymbolicBoundTightener::storeIntoOther( SymbolicBoundTightener &other ) con
     {
         memcpy( other._biases[i], _biases[i], sizeof(double) * _layerSizes[i] );
     }
+
+
 
     other._inputLayerSize = _inputLayerSize;
     other._maxLayerSize = _maxLayerSize;

@@ -58,6 +58,12 @@ public:
     bool solve( unsigned timeoutInSeconds = 0 );
 
     /*
+      Attempt to optimize the input.
+      (a timeout of 0 means no time limit). Returns true if found, false if infeasible.
+    */
+    bool optimize( unsigned timeoutInSeconds );
+
+    /*
       Process the input query and pass the needed information to the
       underlying tableau. Return false if query is found to be infeasible,
       true otherwise.
@@ -164,6 +170,14 @@ private:
         PERFORMED_WEAK_RESTORATION = 2,
     };
 
+    bool _noEnteringCandidatesLeft = false;
+    double _bestOptValSoFar = -100000000000;
+    Map<unsigned, double> _bestSolutionSoFar;
+
+    // Store the current assignment of input variables into _bestSolutionSoFar
+    // If preprocessing occurred, this backtracks to find which input variables
+    // the current set of variables corresponds to
+    void updateBestSolutionSoFar();
 
     /*
       Perform bound tightening operations that require

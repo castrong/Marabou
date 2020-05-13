@@ -39,6 +39,8 @@ Preprocessor::Preprocessor()
 
 InputQuery Preprocessor::preprocess( const InputQuery &query, bool attemptVariableElimination )
 {
+
+    printf("Preprocessing\n");
     _preprocessed = query;
 
     /*

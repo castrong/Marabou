@@ -145,17 +145,62 @@ void CostFunctionManager::computeCoreCostFunction()
       evaluation thereof on a specific point.
     */
 
+    // Once linear is solved, we won't need to check anymore since it will stay
+    if( _optimize)
+    {
+      updateLinearSolved();
+    }
+
     std::fill( _costFunction, _costFunction + _n - _m, 0.0 );
 
-    computeBasicOOBCosts();
-    computeMultipliers();
-    computeReducedCosts();
+    // Phase I - find a feasible solution
+    if(!_linearSolved)
+    {
+      computeBasicOOBCosts();
+      computeMultipliers();
+      computeReducedCosts();
+    }
+    // Phase II - optimize our objective function
+    else
+    {
+      //printf("Linear is solved, generating cost function to optimize\n");
+      //printf("Opt var: %d\n", _optimizationVariable);
+      //printf("Value of opt var: %f\n", _tableau->getValue(_optimizationVariable));
+      //printf("Val via basic assignment: %f\n", _tableau->getBasicAssignment( _tableau->variableToIndex(_optimizationVariable) ));
+      //printf("Our opt variable is basic: %d\n", _tableau->isBasic(_optimizationVariable));
+      
+      std::fill( _basicCosts, _basicCosts + _m, 0.0 );
+      _basicCosts[_tableau->variableToIndex(_optimizationVariable)] = -1.0;
+      computeMultipliers();
+      computeReducedCosts();
+    }
 
     _costFunctionStatus = ICostFunctionManager::COST_FUNCTION_JUST_COMPUTED;
 }
 
+void CostFunctionManager::updateLinearSolved()
+{
+      _linearSolved = !_tableau->existsBasicOutOfBounds();
+}
+
 void CostFunctionManager::adjustBasicCostAccuracy()
 {
+
+    if( _optimize)
+    {
+      updateLinearSolved();
+    }
+
+    // TODO (Chris Strong): Find what changes need to be made for this to work with optimization
+    // FOR NOW JUST THROW THIS TO THE GENERAL COMPUTE IT ALL FUNCTION
+    // fix this eventually? only need compute 1 thing so probably can just compute every time?
+    if (_linearSolved)
+    {
+      computeCoreCostFunction();
+      return;
+    }
+
+
     unsigned variable;
     double assignment, lb, relaxedLb, ub, relaxedUb;
 
@@ -304,6 +349,24 @@ const double *CostFunctionManager::getCostFunction() const
     return _costFunction;
 }
 
+void CostFunctionManager::setOptimize( bool optimize )
+{
+    _optimize = optimize;
+}
+
+void CostFunctionManager::setOptimizationVariable( unsigned variable )
+{
+    _optimizationVariable = variable;
+}
+bool CostFunctionManager::getOptimize()
+{
+    return _optimize;
+}
+unsigned CostFunctionManager::getOptimizationVariable()
+{
+    return _optimizationVariable;
+}
+
 double CostFunctionManager::updateCostFunctionForPivot( unsigned enteringVariableIndex,
                                                         unsigned leavingVariableIndex,
                                                         double pivotElement,
@@ -311,6 +374,21 @@ double CostFunctionManager::updateCostFunctionForPivot( unsigned enteringVariabl
                                                         const double *changeColumn
                                                         )
 {
+      if( _optimize)
+      {
+        updateLinearSolved();
+      }
+
+
+      // TODO (Chris Strong): Find what changes need to be made for this to work with optimization
+      // FOR NOW JUST THROW THIS TO THE GENERAL COMPUTE IT ALL FUNCTION
+      if (_linearSolved)
+      {
+        computeCoreCostFunction();
+        return -1.0;
+      }      
+
+
     /*
       This method is invoked when the non-basic _enteringVariable and
       basic _leaving variable are about to be swapped. It updates the
@@ -366,6 +444,7 @@ double CostFunctionManager::updateCostFunctionForPivot( unsigned enteringVariabl
     _basicCosts[leavingVariableIndex] = 0;
 
     _costFunctionStatus = ICostFunctionManager::COST_FUNCTION_UPDATED;
+
     return normalizedError;
 }
 

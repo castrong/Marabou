@@ -206,6 +206,8 @@ public:
       Picks the entering variable.
     */
     bool eligibleForEntry( unsigned nonBasic, const double *costFunction ) const;
+    bool eligibleForLeaving( unsigned i ) const;
+
     unsigned getEnteringVariable() const;
     unsigned getEnteringVariableIndex() const;
     bool nonBasicCanIncrease( unsigned nonBasic ) const;
@@ -279,6 +281,15 @@ public:
       reduce the cost value.
     */
     void getEntryCandidates( List<unsigned> &candidates ) const;
+
+    /*
+      Get a list of variables eligible to leave the basis. This
+      allows some variables to remain in the basis if need be.
+      This has a use in keeping a variable representing a cost
+      function in the basis.
+    */
+    void getLeavingCandidates( List<unsigned> &candidates ) const;
+
 
     /*
       Compute the multipliers for a given list of row coefficient.

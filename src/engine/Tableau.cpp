@@ -620,6 +620,27 @@ void Tableau::getEntryCandidates( List<unsigned> &candidates ) const
     }
 }
 
+void Tableau::getLeavingCandidates( List<unsigned> &candidates) const
+{
+    candidates.clear();
+    for (unsigned i = 0; i < _m; ++i) 
+    {
+        if ( eligibleForLeaving( i ) )
+        {
+            candidates.append( i );
+        }
+    }
+}
+bool Tableau::eligibleForLeaving( unsigned i) const
+{
+    // For now, the only one excluded from leaving corresponds to a variable
+    // Representing the cost function to optimize
+    // We only exclude any when optimizing
+    bool eligible = (basicIndexToVariable(i) != _costFunctionManager->getOptimizationVariable()) 
+        || !(_costFunctionManager->getOptimize());
+    return eligible;
+}
+
 void Tableau::setEnteringVariableIndex( unsigned nonBasic )
 {
     _enteringVariable = nonBasic;
@@ -715,6 +736,7 @@ void Tableau::performPivot()
 {
     if ( _leavingVariable == _m )
     {
+
         if ( _statistics )
             _statistics->incNumTableauBoundHopping();
 
@@ -749,6 +771,28 @@ void Tableau::performPivot()
     unsigned currentBasic = _basicIndexToVariable[_leavingVariable];
     unsigned currentNonBasic = _nonBasicIndexToVariable[_enteringVariable];
 
+
+    //_costFunctionManager->dumpCostFunction();
+    //dumpAssignment();
+
+    /*
+    printf("Tableau performing pivot. Entering: %u, Leaving: %u\n",
+                  _nonBasicIndexToVariable[_enteringVariable],
+                  _basicIndexToVariable[_leavingVariable] );
+
+    printf("Leaving variable %s. Current value: %.15lf. Range: [%.15lf, %.15lf]\n",
+                  _leavingVariableIncreases ? "increases" : "decreases",
+                  _basicAssignment[_leavingVariable],
+                  _lowerBounds[currentBasic], _upperBounds[currentBasic] );
+
+    printf("Entering variable %s. Current value: %.15lf. Range: [%.15lf, %.15lf]\n",
+                  FloatUtils::isNegative( _costFunctionManager->getCostFunction()[_enteringVariable] ) ?
+                  "increases" : "decreases",
+                  _nonBasicAssignment[_enteringVariable],
+                  _lowerBounds[currentNonBasic], _upperBounds[currentNonBasic] );
+    printf("Change ratio is: %.15lf\n", _changeRatio );
+
+
     log( Stringf( "Tableau performing pivot. Entering: %u, Leaving: %u",
                   _nonBasicIndexToVariable[_enteringVariable],
                   _basicIndexToVariable[_leavingVariable] ) );
@@ -762,6 +806,7 @@ void Tableau::performPivot()
                   _nonBasicAssignment[_enteringVariable],
                   _lowerBounds[currentNonBasic], _upperBounds[currentNonBasic] ) );
     log( Stringf( "Change ratio is: %.15lf\n", _changeRatio ) );
+    */
 
     // As part of the pivot operation we use both the pivot row and
     // pivot column. If they don't agree on the intersection, there's some
@@ -770,6 +815,11 @@ void Tableau::performPivot()
     double pivotEntryByRow = _pivotRow->_row[_enteringVariable]._coefficient;
     if ( !FloatUtils::isZero( pivotEntryByRow - pivotEntryByColumn, GlobalConfiguration::PIVOT_ROW_AND_COLUMN_TOLERANCE ) )
         throw MalformedBasisException();
+/*
+
+    printf("ASSIGNMENT AFTER PIVOT");
+    dumpAssignment();
+*/
 
     updateAssignmentForPivot();
     updateCostFunctionForPivot();
@@ -942,6 +992,8 @@ double Tableau::ratioConstraintPerBasic( unsigned basicIndex, double coefficient
 void Tableau::pickLeavingVariable()
 {
     pickLeavingVariable( _changeColumn );
+    // Assert that if we're optimizing, the leaving variable cant be equal to the optimization variable since it has to stay in the basis.
+    ASSERT(_costFunctionManager->getOptimize() ? (_leavingVariable != variableToIndex(_costFunctionManager->getOptimizationVariable())) : true);
 }
 
 void Tableau::pickLeavingVariable( double *changeColumn )
@@ -977,6 +1029,12 @@ void Tableau::standardRatioTest( double *changeColumn )
     // A marker to show that no leaving variable has been selected
     _leavingVariable = _m;
 
+    printf("Leaving variable start: %d\n", _leavingVariable);
+    // Possible leaving variables to consider - not the variable index, but their index in terms of
+    // numbering each of the basic variables
+    List<unsigned> leavingVariableCandidates;
+    getLeavingCandidates(leavingVariableCandidates);
+
     double largestPivot = 0;
     if ( decrease )
     {
@@ -988,7 +1046,8 @@ void Tableau::standardRatioTest( double *changeColumn )
         // Iterate over the basics that depend on the entering
         // variable and see if any of them imposes a tighter
         // constraint.
-        for ( unsigned i = 0; i < _m; ++i )
+
+        for ( unsigned i :  leavingVariableCandidates )
         {
             if ( changeColumn[i] >= +GlobalConfiguration::PIVOT_CHANGE_COLUMN_TOLERANCE ||
                  changeColumn[i] <= -GlobalConfiguration::PIVOT_CHANGE_COLUMN_TOLERANCE )
@@ -1001,6 +1060,8 @@ void Tableau::standardRatioTest( double *changeColumn )
                     _changeRatio = ratio;
                     _leavingVariable = i;
                     largestPivot = FloatUtils::abs( changeColumn[i] );
+                    printf("setting leaving variable to: %d\n", _leavingVariable);
+
                 }
             }
         }
@@ -1019,8 +1080,9 @@ void Tableau::standardRatioTest( double *changeColumn )
         // Iterate over the basics that depend on the entering
         // variable and see if any of them imposes a tighter
         // constraint.
-        for ( unsigned i = 0; i < _m; ++i )
+        for ( unsigned i :  leavingVariableCandidates )
         {
+
             if ( changeColumn[i] >= +GlobalConfiguration::PIVOT_CHANGE_COLUMN_TOLERANCE ||
                  changeColumn[i] <= -GlobalConfiguration::PIVOT_CHANGE_COLUMN_TOLERANCE )
             {
@@ -1032,6 +1094,8 @@ void Tableau::standardRatioTest( double *changeColumn )
                     _changeRatio = ratio;
                     _leavingVariable = i;
                     largestPivot = FloatUtils::abs( changeColumn[i] );
+                    printf("setting leaving variable to: %d\n", _leavingVariable);
+
                 }
             }
         }
@@ -1074,6 +1138,11 @@ void Tableau::harrisRatioTest( double *changeColumn )
             }
         });
 
+    // Possible leaving variables to consider - not the variable index, but their index in terms of
+    // numbering each of the basic variables
+    List<unsigned> leavingVariableCandidates;
+    getLeavingCandidates(leavingVariableCandidates);
+
     /*
       Alfa:
 
@@ -1094,7 +1163,7 @@ void Tableau::harrisRatioTest( double *changeColumn )
         // variable and see if any of them imposes a tighter
         // constraint.
         double ratioConstraintPerBasic;
-        for ( unsigned i = 0; i < _m; ++i )
+        for ( unsigned i :  leavingVariableCandidates )
         {
             unsigned basic = _basicIndexToVariable[i];
             double basicCost = _costFunctionManager->getBasicCost( i );
@@ -1158,7 +1227,7 @@ void Tableau::harrisRatioTest( double *changeColumn )
         // variable and see if any of them imposes a tighter
         // constraint.
         double ratioConstraintPerBasic;
-        for ( unsigned i = 0; i < _m; ++i )
+        for ( unsigned i :  leavingVariableCandidates )
         {
             unsigned basic = _basicIndexToVariable[i];
             double basicCost = _costFunctionManager->getBasicCost( i );
@@ -1245,7 +1314,7 @@ void Tableau::harrisRatioTest( double *changeColumn )
     {
         // Change ratios are negative
         double ratioConstraintPerBasic;
-        for ( unsigned i = 0; i < _m; ++i )
+        for ( unsigned i :  leavingVariableCandidates )
         {
             unsigned basic = _basicIndexToVariable[i];
             double basicCost = _costFunctionManager->getBasicCost( i );
@@ -1295,6 +1364,7 @@ void Tableau::harrisRatioTest( double *changeColumn )
             double pivot = FloatUtils::abs( changeColumn[i] );
             if ( ( ratioConstraintPerBasic >= optimalChangeRatio ) && ( pivot > largestPivot ) )
             {
+
                 largestPivot = pivot;
                 _leavingVariable = i;
                 _changeRatio = ratioConstraintPerBasic;
@@ -1306,7 +1376,7 @@ void Tableau::harrisRatioTest( double *changeColumn )
     {
         // Change ratios are positive
         double ratioConstraintPerBasic;
-        for ( unsigned i = 0; i < _m; ++i )
+        for ( unsigned i :  leavingVariableCandidates )
         {
             unsigned basic = _basicIndexToVariable[i];
             double basicCost = _costFunctionManager->getBasicCost( i );

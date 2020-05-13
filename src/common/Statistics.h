@@ -99,6 +99,8 @@ public:
     unsigned getNumVisitedTreeStates() const;
     unsigned getNumSplits() const;
     unsigned long long getTotalTime() const;
+    long double getPercentDone() const;
+    void incPercentDone(unsigned depth);
 
     /*
       Report a timeout, or check whether a timeout has occurred
@@ -190,6 +192,8 @@ private:
     // Current and max stack depth in the SMT core
     unsigned _currentStackDepth;
     unsigned _maxStackDepth;
+
+    long double _percentDone;
 
     // Total number of splits so far
     unsigned _numSplits;

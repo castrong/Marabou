@@ -153,6 +153,15 @@ bool SmtCore::popSplit()
 {
     log( "Performing a pop" );
 
+    // erasing a split is what is relevant! this is the node we're working on currently though, how to get the one we just finished?
+    // can I get that info from the previously active split?
+    // WE FINISHED something at this depth, so can increment here?
+    // Maybe stack depth + 1 since it'll be 0 when we're at layer 1?
+    if(_statistics != NULL)
+    {
+        _statistics->incPercentDone(getStackDepth());
+    }
+    
     if ( _stack.empty() )
         return false;
 
@@ -211,6 +220,8 @@ bool SmtCore::popSplit()
 
     stackEntry->_activeSplit = *split;
     stackEntry->_alternativeSplits.erase( split );
+
+
 
     if ( _statistics )
     {

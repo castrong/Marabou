@@ -34,6 +34,16 @@ public:
     void initialize();
 
     /*
+      Set _optimize and _optimizationVariable
+    */
+    void setOptimize( bool optimize );
+    void setOptimizationVariable( unsigned variable );
+    bool getOptimize();
+    unsigned getOptimizationVariable();
+    void updateLinearSolved();
+
+
+    /*
       Compute the cost function, from scratch.
       Either compute just the core cost function, or add to it also
       a heuristic-based component.
@@ -99,6 +109,10 @@ private:
     */
     unsigned _n;
     unsigned _m;
+
+    bool _optimize = false;
+    unsigned _optimizationVariable = -1;
+    bool _linearSolved = false;
 
     /*
       Status of the cost function.

@@ -81,6 +81,8 @@ public:
       - Lower and upper bounds for input neurons
     */
     void setNumberOfLayers( unsigned layers );
+    unsigned getNumberOfLayers();
+
     void setLayerSize( unsigned layer, unsigned layerSize );
     void allocateWeightAndBiasSpace();
     void setBias( unsigned layer, unsigned neuron, double bias );

@@ -43,6 +43,7 @@ class MarabouNetwork:
         self.upperBounds = dict()
         self.inputVars = []
         self.outputVars = np.array([])
+        self.optimizationVariable = -1
 
     def getNewVariable(self):
         """
@@ -61,6 +62,9 @@ class MarabouNetwork:
             x: (MarabouUtils.Equation) representing new equation
         """
         self.equList += [x]
+
+    def setOptimizationVariable(self, var):
+        self.optimizationVariable = var
 
     def setLowerBound(self, x, v):
         """
@@ -128,7 +132,7 @@ class MarabouNetwork:
         # ReLUs
         return x in self.varsParticipatingInConstraints
 
-    def getMarabouQuery(self):
+    def getMarabouQuery(self, optimize = False):
         """
         Function to convert network into Marabou Query
         Returns:
@@ -136,6 +140,10 @@ class MarabouNetwork:
         """
         ipq = MarabouCore.InputQuery()
         ipq.setNumberOfVariables(self.numVars)
+        ipq.setOptimize(optimize)
+        # Only mark the variable that corresponds to the objective function if we're optimizing
+        if (optimize):
+            ipq.markOptimizationVariable(self.optimizationVariable)
 
         i = 0
         for inputVarArray in self.inputVars:
@@ -193,7 +201,7 @@ class MarabouNetwork:
                     it has multiple methods that provide information related
                     to how an input query was solved.
         """
-        ipq = self.getMarabouQuery()
+        ipq = self.getMarabouQuery(options._optimize)
         if options == None:
             options = MarabouCore.Options()
         vals, stats = MarabouCore.solve(ipq, options, filename)
