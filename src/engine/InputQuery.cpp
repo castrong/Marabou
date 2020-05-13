@@ -22,7 +22,6 @@
 
 InputQuery::InputQuery()
     : _networkLevelReasoner( NULL )
-    , _sbt( NULL )
 {
 }
 
@@ -33,12 +32,6 @@ InputQuery::~InputQuery()
     {
         delete _networkLevelReasoner;
         _networkLevelReasoner = NULL;
-    }
-
-    if ( _sbt )
-    {
-        delete _sbt;
-        _sbt = NULL;
     }
 }
 
@@ -257,6 +250,7 @@ InputQuery &InputQuery::operator=( const InputQuery &other )
         }
     }
 
+<<<<<<< HEAD
     if ( other._sbt )
     {
         if ( !_sbt )
@@ -273,12 +267,13 @@ InputQuery &InputQuery::operator=( const InputQuery &other )
         }
     }
 
+=======
+>>>>>>> NeuralNetworkVerification/master
     return *this;
 }
 
 InputQuery::InputQuery( const InputQuery &other )
     : _networkLevelReasoner( NULL )
-    , _sbt( NULL )
 {
     *this = other;
 }
@@ -357,7 +352,7 @@ void InputQuery::saveQuery( const String &fileName )
     // Lower Bounds
     for ( const auto &lb : _lowerBounds )
         queryFile->write( Stringf( "\n%d,%f", lb.first, lb.second ) );
-    
+
     // Upper Bounds
     for ( const auto &ub : _upperBounds )
         queryFile->write( Stringf( "\n%d,%f", ub.first, ub.second ) );
@@ -450,9 +445,33 @@ List<unsigned> InputQuery::getOutputVariables() const
     return result;
 }
 
+<<<<<<< HEAD
 unsigned InputQuery::getOptimizationVariable() const
 {
     return _optimizationVariable;
+=======
+void InputQuery::printAllBounds() const
+{
+    printf( "InputQuery: Dumping all bounds\n" );
+
+    for ( unsigned i = 0; i < _numberOfVariables; ++i )
+    {
+        printf( "\tx%u: [", i );
+        if ( _lowerBounds.exists( i ) )
+            printf( "%lf, ", _lowerBounds[i] );
+        else
+            printf( "-INF, " );
+
+        if ( _upperBounds.exists( i ) )
+            printf( "%lf]", _upperBounds[i] );
+        else
+            printf( "+INF]" );
+        printf( "\n" );
+
+    }
+
+    printf( "\n\n" );
+>>>>>>> NeuralNetworkVerification/master
 }
 
 void InputQuery::printInputOutputBounds() const
@@ -504,12 +523,15 @@ void InputQuery::dump() const
     }
 }
 
+<<<<<<< HEAD
 void InputQuery::setSymbolicBoundTightener( SymbolicBoundTightener *sbt )
 {
     printf("setting symbolic bound tightener\n");
     _sbt = sbt;
 }
 
+=======
+>>>>>>> NeuralNetworkVerification/master
 void InputQuery::adjustInputOutputMapping( const Map<unsigned, unsigned> &oldIndexToNewIndex,
                                            const Map<unsigned, unsigned> &mergedVariables )
 {

@@ -22,7 +22,6 @@
 #include "Map.h"
 #include "NetworkLevelReasoner.h"
 #include "PiecewiseLinearConstraint.h"
-#include "SymbolicBoundTightener.h"
 
 class InputQuery
 {
@@ -60,8 +59,12 @@ public:
       Methods for handling input and output variables
     */
     void markInputVariable( unsigned variable, unsigned inputIndex );
+<<<<<<< HEAD
     void markOutputVariable( unsigned variable, unsigned inputIndex );
     void markOptimizationVariable( unsigned variable );
+=======
+    void markOutputVariable( unsigned variable, unsigned outputIndex );
+>>>>>>> NeuralNetworkVerification/master
     unsigned inputVariableByIndex( unsigned index ) const;
     unsigned outputVariableByIndex( unsigned index ) const;
     unsigned getNumInputVariables() const;
@@ -100,11 +103,6 @@ public:
     InputQuery( const InputQuery &other );
 
     /*
-      Attach a symbolic bound tightener to the input query
-    */
-    void setSymbolicBoundTightener( SymbolicBoundTightener *sbt );
-
-    /*
       Debugging methods
     */
 
@@ -124,6 +122,7 @@ public:
     */
     void printInputOutputBounds() const;
     void dump() const;
+    void printAllBounds() const;
 
     /*
       Adjsut the input/output variable mappings because variables have been merged
@@ -172,11 +171,6 @@ public:
       evaluation of topology-based bound tightening.
      */
     NetworkLevelReasoner *_networkLevelReasoner;
-
-    /*
-      Symbolic bound tightener.
-    */
-    SymbolicBoundTightener *_sbt;
 };
 
 #endif // __InputQuery_h__
