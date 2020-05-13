@@ -252,22 +252,8 @@ PYBIND11_MODULE(MarabouCore, m) {
         .def_readwrite("_timeoutInSeconds", &MarabouOptions::_timeoutInSeconds)
         .def_readwrite("_timeoutFactor", &MarabouOptions::_timeoutFactor)
         .def_readwrite("_verbosity", &MarabouOptions::_verbosity)
-<<<<<<< HEAD
-        .def_readwrite("_dnc", &MarabouOptions::_dnc)
-        .def_readwrite("_optimize", &MarabouOptions::_optimize);
-    py::class_<SymbolicBoundTightener, std::unique_ptr<SymbolicBoundTightener,py::nodelete>>(m, "SymbolicBoundTightener")
-        .def(py::init())
-        .def("setNumberOfLayers", &SymbolicBoundTightener::setNumberOfLayers)
-        .def("setLayerSize", &SymbolicBoundTightener::setLayerSize)
-        .def("allocateWeightAndBiasSpace", &SymbolicBoundTightener::allocateWeightAndBiasSpace)
-        .def("setBias", &SymbolicBoundTightener::setBias)
-        .def("setWeight", &SymbolicBoundTightener::setWeight)
-        .def("setInputLowerBound", &SymbolicBoundTightener::setInputLowerBound)
-        .def("setInputUpperBound", &SymbolicBoundTightener::setInputUpperBound)
-        .def("setReluBVariable", &SymbolicBoundTightener::setReluBVariable)
-        .def("setReluFVariable", &SymbolicBoundTightener::setReluFVariable);
-=======
         .def_readwrite("_dnc", &MarabouOptions::_dnc);
+        .def_readwrite("_optimize", &MarabouOptions::_optimize);
     py::class_<NetworkLevelReasoner, std::unique_ptr<NetworkLevelReasoner,py::nodelete>> nlr(m, "NetworkLevelReasoner");
     nlr.def(py::init());
     nlr.def("setNumberOfLayers", &NetworkLevelReasoner::setNumberOfLayers);
@@ -282,7 +268,6 @@ PYBIND11_MODULE(MarabouCore, m) {
         .value("ReLU", NetworkLevelReasoner::ActivationFunction::ReLU)
         .value("AbsoluteValue", NetworkLevelReasoner::ActivationFunction::AbsoluteValue)
         .export_values();
->>>>>>> NeuralNetworkVerification/master
     py::class_<Equation> eq(m, "Equation");
     eq.def(py::init());
     eq.def(py::init<Equation::EquationType>());

@@ -15,15 +15,7 @@
  ** [[ Add lengthier description here ]]
  **/
 '''
-<<<<<<< HEAD
-
-#Marabou File
-from .MarabouNetworkNNet import *
-from .MarabouNetworkTF import *
-#from .MarabouNetworkONNX import *
-=======
 import warnings
->>>>>>> NeuralNetworkVerification/master
 from .MarabouCore import *
 from .MarabouNetworkNNet import *
 
@@ -95,7 +87,7 @@ def solve_query(ipq, filename="", verbose=True, timeout=0, verbosity=2):
     """
     Function to solve query represented by this network
     Arguments:
-        ipq: (MarabouCore.InputQuery) InputQuery object, which can be obtained from 
+        ipq: (MarabouCore.InputQuery) InputQuery object, which can be obtained from
                 MarabouNetwork.getInputQuery or load_query
         filename: (string) path to redirect output to
         timeout: (int) time in seconds when Marabou will time out

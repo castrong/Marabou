@@ -125,15 +125,9 @@ class MarabouNetworkNNet(MarabouNetwork.MarabouNetwork):
 
         return nlr
 
-<<<<<<< HEAD
-    def getMarabouQuery(self, optimize = False):
-        ipq = super(MarabouNetworkNNet, self).getMarabouQuery(optimize)
-        ipq.setSymbolicBoundTightener(self.sbt)
-=======
     def getMarabouQuery(self):
         ipq = super(MarabouNetworkNNet, self).getMarabouQuery()
         ipq.setNetworkLevelReasoner(self.nlr)
->>>>>>> NeuralNetworkVerification/master
         return ipq
 
     """
