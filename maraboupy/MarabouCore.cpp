@@ -139,6 +139,8 @@ struct MarabouOptions {
 std::pair<std::map<int, double>, Statistics> solve(InputQuery &inputQuery, MarabouOptions &options,
                                                    std::string redirect=""){
 
+    printf("Start of solve\n");
+
     // Arguments: InputQuery object, filename to redirect output
     // Returns: map from variable number to value
     std::map<int, double> ret;
@@ -147,12 +149,16 @@ std::pair<std::map<int, double>, Statistics> solve(InputQuery &inputQuery, Marab
     if(redirect.length()>0)
         output=redirectOutputToFile(redirect);
     try{
+        printf("start of try\n");
+
         bool verbosity = options._verbosity;
         unsigned timeoutInSeconds = options._timeoutInSeconds;
         bool dnc = options._dnc;
 
         Engine engine;
+        printf("Before set engine verbosity");
         engine.setVerbosity(verbosity);
+        printf("before process input query\n");
 
         if(!engine.processInputQuery(inputQuery)) return std::make_pair(ret, *(engine.getStatistics()));
         if ( dnc )
@@ -188,6 +194,7 @@ std::pair<std::map<int, double>, Statistics> solve(InputQuery &inputQuery, Marab
             }
         } else
         {
+            printf("Reached else in maraboucore\n");
             if(!engine.solve(timeoutInSeconds)) return std::make_pair(ret, *(engine.getStatistics()));
 
             if (engine.getExitCode() == Engine::SAT)
