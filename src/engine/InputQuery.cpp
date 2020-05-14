@@ -43,6 +43,7 @@ void InputQuery::setNumberOfVariables( unsigned numberOfVariables )
 
 void InputQuery::setDivideStrategy(DivideStrategy divideStrategy)
 {
+    printf("Setting divide strategy in input query\n");
     switch(divideStrategy) {
         case DivideStrategy::EarliestReLU:
             _divideStrategy = DivideStrategy::EarliestReLU;

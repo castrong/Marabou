@@ -1051,6 +1051,8 @@ void Engine::initializeNetworkLevelReasoning()
 
 bool Engine::processInputQuery( InputQuery &inputQuery, bool preprocess )
 {
+    printf("start of second process input query\n");
+
     log( "processInputQuery starting\n" );
 
     struct timespec start = TimeUtils::sampleMicro();
@@ -1074,7 +1076,6 @@ bool Engine::processInputQuery( InputQuery &inputQuery, bool preprocess )
         selectInitialVariablesForBasis( constraintMatrix, initialBasis, basicRows );
         addAuxiliaryVariables();
         augmentInitialBasisIfNeeded( initialBasis, basicRows );
-
         storeEquationsInDegradationChecker();
 
         // The equations have changed, recreate the constraint matrix
@@ -1102,9 +1103,10 @@ bool Engine::processInputQuery( InputQuery &inputQuery, bool preprocess )
         _exitCode = Engine::UNSAT;
         return false;
     }
+
     // Set the divide strategy - it will default to DivideStrategy::None
-    _smtCore.setDivideStrategy(_preprocessedQuery.getDivideStrategy());
-    
+    _smtCore.setDivideStrategy(inputQuery.getDivideStrategy());
+
     log( "processInputQuery done\n" );
 
     _smtCore.storeDebuggingSolution( _preprocessedQuery._debuggingSolution );

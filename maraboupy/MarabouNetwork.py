@@ -136,7 +136,6 @@ class MarabouNetwork:
         """
         ipq = MarabouCore.InputQuery()
         ipq.setNumberOfVariables(self.numVars)
-
         i = 0
         for inputVarArray in self.inputVars:
             for inputVar in inputVarArray.flatten():
@@ -173,7 +172,7 @@ class MarabouNetwork:
         for u in self.upperBounds:
             assert u < self.numVars
             ipq.setUpperBound(u, self.upperBounds[u])
-            
+
         return ipq
 
     def solve(self, filename="", verbose=True, options=None):
@@ -193,10 +192,13 @@ class MarabouNetwork:
                     it has multiple methods that provide information related
                     to how an input query was solved.
         """
+        print("entered solve here")
         ipq = self.getMarabouQuery()
         if options == None:
             options = MarabouCore.Options()
+        print("right before set divide strategy")
         ipq.setDivideStrategy(options._divideStrategy)
+        print("right after set divide strategy")
         vals, stats = MarabouCore.solve(ipq, options, filename)
         if verbose:
             if stats.hasTimedOut():
