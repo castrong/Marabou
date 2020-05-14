@@ -20,6 +20,7 @@
 #include "PiecewiseLinearConstraint.h"
 #include "Stack.h"
 #include "Statistics.h"
+#include "DivideStrategy.h"
 
 class EngineState;
 class IEngine;
@@ -110,6 +111,8 @@ public:
     bool checkSkewFromDebuggingSolution();
     bool splitAllowsStoredSolution( const PiecewiseLinearCaseSplit &split, String &error ) const;
 
+    void setDivideStrategy(DivideStrategy divideStrategy);
+
 private:
     /*
       A stack entry consists of the engine state before the split,
@@ -173,6 +176,11 @@ private:
       Split when some relu has been violated for this many times
     */
     unsigned _constraintViolationThreshold;
+
+    /*
+     Divide strategy enum if set in the input query - otherwise it will be NULL and should be drawn from GlobalConfiguration.cpp
+     */
+     DivideStrategy _divideStrategy = DivideStrategy::None;
 };
 
 #endif // __SmtCore_h__

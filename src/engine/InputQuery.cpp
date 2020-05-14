@@ -19,6 +19,7 @@
 #include "InputQuery.h"
 #include "MStringf.h"
 #include "MarabouError.h"
+#include "DivideStrategy.h"
 
 InputQuery::InputQuery()
     : _networkLevelReasoner( NULL )
@@ -38,6 +39,29 @@ InputQuery::~InputQuery()
 void InputQuery::setNumberOfVariables( unsigned numberOfVariables )
 {
     _numberOfVariables = numberOfVariables;
+}
+
+void InputQuery::setDivideStrategy(DivideStrategy divideStrategy)
+{
+    switch(divideStrategy) {
+        case DivideStrategy::EarliestReLU:
+            _divideStrategy = DivideStrategy::EarliestReLU;
+            break;
+        case DivideStrategy::ReLUViolation:
+            _divideStrategy = DivideStrategy::ReLUViolation;
+            break;
+        case DivideStrategy::LargestInterval:
+            return;
+            break; // This shouldn't be sent, decides input splitting
+        case DivideStrategy::None:
+            _divideStrategy = DivideStrategy::None;
+            break;
+        }
+}
+
+DivideStrategy InputQuery::getDivideStrategy()
+{
+    return _divideStrategy;
 }
 
 void InputQuery::setLowerBound( unsigned variable, double bound )
@@ -217,6 +241,7 @@ InputQuery &InputQuery::operator=( const InputQuery &other )
     _inputIndexToVariable = other._inputIndexToVariable;
     _variableToOutputIndex = other._variableToOutputIndex;
     _outputIndexToVariable = other._outputIndexToVariable;
+    _divideStrategy = other._divideStrategy;
 
     freeConstraintsIfNeeded();
     for ( const auto &constraint : other._plConstraints )

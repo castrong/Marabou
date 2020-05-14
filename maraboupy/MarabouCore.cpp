@@ -37,6 +37,7 @@
 #include "QueryLoader.h"
 #include "ReluConstraint.h"
 #include "Set.h"
+#include "DivideStrategy.h"
 
 #ifdef _WIN32
 #define STDOUT_FILENO 1
@@ -119,6 +120,7 @@ struct MarabouOptions {
         , _timeoutFactor( 1.5 )
         , _verbosity( 2 )
         , _dnc( false )
+        , _divideStrategy( DivideStrategy::None )
     {};
 
     unsigned _numWorkers;
@@ -129,12 +131,14 @@ struct MarabouOptions {
     float _timeoutFactor;
     unsigned _verbosity;
     bool _dnc;
+    DivideStrategy _divideStrategy;
 };
 
 /* The default parameters here are just for readability, you should specify
  * them in the to make them work*/
 std::pair<std::map<int, double>, Statistics> solve(InputQuery &inputQuery, MarabouOptions &options,
                                                    std::string redirect=""){
+
     // Arguments: InputQuery object, filename to redirect output
     // Returns: map from variable number to value
     std::map<int, double> ret;
@@ -237,7 +241,8 @@ PYBIND11_MODULE(MarabouCore, m) {
         .def("markInputVariable", &InputQuery::markInputVariable)
         .def("markOutputVariable", &InputQuery::markOutputVariable)
         .def("outputVariableByIndex", &InputQuery::outputVariableByIndex)
-        .def("setNetworkLevelReasoner", &InputQuery::setNetworkLevelReasoner);
+        .def("setNetworkLevelReasoner", &InputQuery::setNetworkLevelReasoner)
+        .def("setDivideStrategy", &InputQuery::setDivideStrategy);
     py::class_<MarabouOptions>(m, "Options")
         .def(py::init())
         .def_readwrite("_numWorkers", &MarabouOptions::_numWorkers)
@@ -247,7 +252,8 @@ PYBIND11_MODULE(MarabouCore, m) {
         .def_readwrite("_timeoutInSeconds", &MarabouOptions::_timeoutInSeconds)
         .def_readwrite("_timeoutFactor", &MarabouOptions::_timeoutFactor)
         .def_readwrite("_verbosity", &MarabouOptions::_verbosity)
-        .def_readwrite("_dnc", &MarabouOptions::_dnc);
+        .def_readwrite("_dnc", &MarabouOptions::_dnc)
+        .def_readwrite("_divideStrategy", &MarabouOptions::_divideStrategy);
     py::class_<NetworkLevelReasoner, std::unique_ptr<NetworkLevelReasoner,py::nodelete>> nlr(m, "NetworkLevelReasoner");
     nlr.def(py::init());
     nlr.def("setNumberOfLayers", &NetworkLevelReasoner::setNumberOfLayers);
@@ -261,6 +267,12 @@ PYBIND11_MODULE(MarabouCore, m) {
     py::enum_<NetworkLevelReasoner::ActivationFunction>(nlr, "ActivationFunction")
         .value("ReLU", NetworkLevelReasoner::ActivationFunction::ReLU)
         .value("AbsoluteValue", NetworkLevelReasoner::ActivationFunction::AbsoluteValue)
+        .export_values();
+    py::enum_<DivideStrategy>(m, "DivideStrategy")
+        .value("LargestInterval", DivideStrategy::LargestInterval)
+        .value("EarliestReLU", DivideStrategy::EarliestReLU)
+        .value("ReLUViolation", DivideStrategy::ReLUViolation)
+        .value("None", DivideStrategy::None)
         .export_values();
     py::class_<Equation> eq(m, "Equation");
     eq.def(py::init());

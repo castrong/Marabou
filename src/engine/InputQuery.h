@@ -22,6 +22,7 @@
 #include "Map.h"
 #include "NetworkLevelReasoner.h"
 #include "PiecewiseLinearConstraint.h"
+#include "DivideStrategy.h"
 
 class InputQuery
 {
@@ -33,6 +34,10 @@ public:
       Methods for setting and getting the input part of the query
     */
     void setNumberOfVariables( unsigned numberOfVariables );
+
+    void setDivideStrategy(DivideStrategy divideStrategy);
+    DivideStrategy getDivideStrategy();
+
     void setLowerBound( unsigned variable, double bound );
     void setUpperBound( unsigned variable, double bound );
 
@@ -129,6 +134,7 @@ public:
 
 private:
     unsigned _numberOfVariables;
+    DivideStrategy _divideStrategy = DivideStrategy::None;
     List<Equation> _equations;
     Map<unsigned, double> _lowerBounds;
     Map<unsigned, double> _upperBounds;

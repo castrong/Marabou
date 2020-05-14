@@ -62,7 +62,10 @@ void SmtCore::reportViolatedConstraint( PiecewiseLinearConstraint *constraint )
          _constraintViolationThreshold )
     {
         _needToSplit = true;
-        if ( GlobalConfiguration::SPLITTING_HEURISTICS == DivideStrategy::ReLUViolation )
+
+        DivideStrategy _strategyToUse = (_divideStrategy == DivideStrategy::None) ? GlobalConfiguration::SPLITTING_HEURISTICS : _divideStrategy;
+
+        if ( _strategyToUse == DivideStrategy::ReLUViolation )
             _constraintForSplitting = constraint;
         else
             pickSplitPLConstraint();
@@ -367,6 +370,23 @@ bool SmtCore::splitAllowsStoredSolution( const PiecewiseLinearCaseSplit &split, 
 void SmtCore::setConstraintViolationThreshold( unsigned threshold )
 {
     _constraintViolationThreshold = threshold;
+}
+
+void SmtCore::setDivideStrategy(DivideStrategy divideStrategy)
+{
+    switch(divideStrategy) {
+        case DivideStrategy::EarliestReLU: 
+            _divideStrategy = DivideStrategy::EarliestReLU; 
+            break;
+        case DivideStrategy::ReLUViolation: 
+            _divideStrategy = DivideStrategy::ReLUViolation; 
+            break;
+        case DivideStrategy::LargestInterval: 
+            return;  // This shouldn't be sent, decides input splitting
+        case DivideStrategy::None: 
+            _divideStrategy = DivideStrategy::None; 
+            break;
+    }
 }
 
 PiecewiseLinearConstraint *SmtCore::chooseViolatedConstraintForFixing( List<PiecewiseLinearConstraint *> &_violatedPlConstraints ) const
