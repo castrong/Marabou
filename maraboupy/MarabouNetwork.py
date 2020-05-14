@@ -196,6 +196,7 @@ class MarabouNetwork:
         ipq = self.getMarabouQuery()
         if options == None:
             options = MarabouCore.Options()
+        ipq.setDivideStrategy(options._divideStrategy)
         vals, stats = MarabouCore.solve(ipq, options, filename)
         if verbose:
             if stats.hasTimedOut():

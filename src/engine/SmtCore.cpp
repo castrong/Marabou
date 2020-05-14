@@ -65,10 +65,14 @@ void SmtCore::reportViolatedConstraint( PiecewiseLinearConstraint *constraint )
 
         DivideStrategy _strategyToUse = (_divideStrategy == DivideStrategy::None) ? GlobalConfiguration::SPLITTING_HEURISTICS : _divideStrategy;
 
-        if ( _strategyToUse == DivideStrategy::ReLUViolation )
+        if ( _strategyToUse == DivideStrategy::ReLUViolation ) {
+            printf("Doing ReLU Violation\n");
             _constraintForSplitting = constraint;
-        else
+        }
+        else{
+            printf("Doing EarlyReLU\n");
             pickSplitPLConstraint();
+        }
     }
 }
 
