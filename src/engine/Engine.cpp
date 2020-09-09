@@ -613,12 +613,17 @@ bool Engine::optimize( unsigned timeoutInSeconds )
                     printf( "\nEngine::solve: final pop was an unsat query\n" );
                     printf("Best value so far is %f\n", _bestOptValSoFar);
                 }
-                // switched to SAT / true b/c as long as the original isnt infeasible there will always be a satisfying solution?
-                // Although if we want to run a query where it finds the optimizer within some output set this
-                // logic may need to be reworked, but it doesn't seem too hard to get that to happen
-                // TODO (Chris Strong): will this ever return before any feasible value has been found?
-                _exitCode = Engine::SAT;
-                return true;
+                // If it hasn't found a feasible value, returns UNSAT
+                if (_bestOptValSoFar == -FloatUtils::infinity())
+                {
+                    _exitCode = Engine::UNSAT;
+                    return false;
+                }
+                else
+                {
+                    _exitCode = Engine::SAT;
+                    return true;
+                }
             }
             else
             {
