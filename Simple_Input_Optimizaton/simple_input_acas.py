@@ -7,8 +7,8 @@ from maraboupy import MarabouUtils
 import time
 
 # Set parameters for the problem that we'd like to solve
-networkFile = "/Users/castrong/Desktop/Research/ExampleMarabou/SimpleACAS/Networks/ACASXU_experimental_v2a_1_3.nnet"
-property = 2
+networkFile = "/Users/castrong/Desktop/Research/ExampleMarabou/SimpleACAS/Networks/ACASXU_experimental_v2a_2_7.nnet"
+property = 4
 dims_to_optimize = [0] # Dimensions that we constraint to be less than epsilon fromo their centroid.
 
 # TODO: FIGURE OUT HOW TO TURN ON AND OFF SBT
