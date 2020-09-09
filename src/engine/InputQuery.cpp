@@ -21,7 +21,7 @@
 #include "MarabouError.h"
 #include "DivideStrategy.h"
 
-#define INPUT_QUERY_LOG( x, ... ) LOG( GlobalConfiguration::INPUT_QUERY_LOGGING, "Preprocessor: %s\n", x )
+#define INPUT_QUERY_LOG( x, ... ) LOG( GlobalConfiguration::INPUT_QUERY_LOGGING, "Input Query: %s\n", x )
 
 InputQuery::InputQuery()
     : _networkLevelReasoner( NULL )
@@ -58,9 +58,12 @@ void InputQuery::setDivideStrategy(DivideStrategy divideStrategy)
         case DivideStrategy::Polarity:
             _divideStrategy = DivideStrategy::Polarity;
             break;
-	    //case DivideStrategy::LargestInterval:
-            //return;
-            //break; // This shouldn't be sent, decides input splitting
+        case DivideStrategy::LargestInterval:
+            _divideStrategy = DivideStrategy::LargestInterval;
+            break; // This shouldn't be sent, decides input splitting
+        case DivideStrategy::Auto:
+            _divideStrategy = DivideStrategy::Auto;
+            break; // Auto
         case DivideStrategy::None:
             _divideStrategy = DivideStrategy::None;
             break;
@@ -722,15 +725,23 @@ bool InputQuery::constructNetworkLevelReasoner()
     List<unsigned> inputs = getInputVariables();
     nlr->addLayer( 0, NLR::Layer::INPUT, inputs.size() );
     unsigned index = 0;
+
+    NLR::Layer *inputLayer = nlr->getLayer( 0 );
     for ( const auto &inputVariable : inputs )
     {
         nlr->setNeuronVariable( NLR::NeuronIndex( 0, index ), inputVariable );
         handledVariableToLayer[inputVariable] = 0;
+
+        inputLayer->setLb( index, _lowerBounds.exists( inputVariable ) ?
+                      _lowerBounds[inputVariable] : FloatUtils::negativeInfinity() );
+        inputLayer->setUb( index, _upperBounds.exists( inputVariable ) ?
+                      _upperBounds[inputVariable] : FloatUtils::infinity() );
+
         ++index;
     }
 
     unsigned newLayerIndex = 1;
-    // Now, repeatedly attempt to construct addditional layers
+    // Now, repeatedly attempt to construct additional layers
     while ( constructWeighedSumLayer( nlr, handledVariableToLayer, newLayerIndex ) ||
             constructReluLayer( nlr, handledVariableToLayer, newLayerIndex ) ||
             constructAbsoluteValueLayer( nlr, handledVariableToLayer, newLayerIndex ) ||
@@ -767,7 +778,7 @@ bool InputQuery::constructWeighedSumLayer( NLR::NetworkLevelReasoner *nlr,
                                            Map<unsigned, unsigned> &handledVariableToLayer,
                                            unsigned newLayerIndex )
 {
-    INPUT_QUERY_LOG( "Attempting to contruct weightedSumLayer..." );
+    INPUT_QUERY_LOG( "Attempting to construct weightedSumLayer..." );
     struct NeuronInformation
     {
     public:
@@ -824,9 +835,16 @@ bool InputQuery::constructWeighedSumLayer( NLR::NetworkLevelReasoner *nlr,
     }
 
     nlr->addLayer( newLayerIndex, NLR::Layer::WEIGHTED_SUM, newNeurons.size() );
+
+    NLR::Layer *layer = nlr->getLayer( newLayerIndex );
     for ( const auto &newNeuron : newNeurons )
     {
         handledVariableToLayer[newNeuron._variable] = newLayerIndex;
+
+        layer->setLb( newNeuron._neuron, _lowerBounds.exists( newNeuron._variable ) ?
+                      _lowerBounds[newNeuron._variable] : FloatUtils::negativeInfinity() );
+        layer->setUb( newNeuron._neuron, _upperBounds.exists( newNeuron._variable ) ?
+                      _upperBounds[newNeuron._variable] : FloatUtils::infinity() );
 
         // Add the new neuron
         nlr->setNeuronVariable( NLR::NeuronIndex( newLayerIndex, newNeuron._neuron ), newNeuron._variable );
@@ -874,7 +892,7 @@ bool InputQuery::constructReluLayer( NLR::NetworkLevelReasoner *nlr,
                                      Map<unsigned, unsigned> &handledVariableToLayer,
                                      unsigned newLayerIndex )
 {
-    INPUT_QUERY_LOG( "Attempting to contruct ReluLayer..." );
+    INPUT_QUERY_LOG( "Attempting to construct ReluLayer..." );
     struct NeuronInformation
     {
     public:
@@ -928,9 +946,16 @@ bool InputQuery::constructReluLayer( NLR::NetworkLevelReasoner *nlr,
     }
 
     nlr->addLayer( newLayerIndex, NLR::Layer::RELU, newNeurons.size() );
+
+    NLR::Layer *layer = nlr->getLayer( newLayerIndex );
     for ( const auto &newNeuron : newNeurons )
     {
         handledVariableToLayer[newNeuron._variable] = newLayerIndex;
+
+        layer->setLb( newNeuron._neuron, _lowerBounds.exists( newNeuron._variable ) ?
+                      _lowerBounds[newNeuron._variable] : FloatUtils::negativeInfinity() );
+        layer->setUb( newNeuron._neuron, _upperBounds.exists( newNeuron._variable ) ?
+                      _upperBounds[newNeuron._variable] : FloatUtils::infinity() );
 
         unsigned sourceLayer = handledVariableToLayer[newNeuron._sourceVariable];
         unsigned sourceNeuron = nlr->getLayer( sourceLayer )->variableToNeuron( newNeuron._sourceVariable );
@@ -956,7 +981,7 @@ bool InputQuery::constructAbsoluteValueLayer( NLR::NetworkLevelReasoner *nlr,
                                               Map<unsigned, unsigned> &handledVariableToLayer,
                                               unsigned newLayerIndex )
 {
-    INPUT_QUERY_LOG( "Attempting to contruct AbsoluteValueLayer..." );
+    INPUT_QUERY_LOG( "Attempting to construct AbsoluteValueLayer..." );
     struct NeuronInformation
     {
     public:
@@ -1010,9 +1035,16 @@ bool InputQuery::constructAbsoluteValueLayer( NLR::NetworkLevelReasoner *nlr,
     }
 
     nlr->addLayer( newLayerIndex, NLR::Layer::ABSOLUTE_VALUE, newNeurons.size() );
+
+    NLR::Layer *layer = nlr->getLayer( newLayerIndex );
     for ( const auto &newNeuron : newNeurons )
     {
         handledVariableToLayer[newNeuron._variable] = newLayerIndex;
+
+        layer->setLb( newNeuron._neuron, _lowerBounds.exists( newNeuron._variable ) ?
+                      _lowerBounds[newNeuron._variable] : FloatUtils::negativeInfinity() );
+        layer->setUb( newNeuron._neuron, _upperBounds.exists( newNeuron._variable ) ?
+                      _upperBounds[newNeuron._variable] : FloatUtils::infinity() );
 
         unsigned sourceLayer = handledVariableToLayer[newNeuron._sourceVariable];
         unsigned sourceNeuron = nlr->getLayer( sourceLayer )->variableToNeuron( newNeuron._sourceVariable );
@@ -1038,7 +1070,7 @@ bool InputQuery::constructSignLayer( NLR::NetworkLevelReasoner *nlr,
                                      Map<unsigned, unsigned> &handledVariableToLayer,
                                      unsigned newLayerIndex )
 {
-    INPUT_QUERY_LOG( "Attempting to contruct SignLayer..." );
+    INPUT_QUERY_LOG( "Attempting to construct SignLayer..." );
     struct NeuronInformation
     {
     public:
@@ -1092,9 +1124,16 @@ bool InputQuery::constructSignLayer( NLR::NetworkLevelReasoner *nlr,
     }
 
     nlr->addLayer( newLayerIndex, NLR::Layer::SIGN, newNeurons.size() );
+
+    NLR::Layer *layer = nlr->getLayer( newLayerIndex );
     for ( const auto &newNeuron : newNeurons )
     {
         handledVariableToLayer[newNeuron._variable] = newLayerIndex;
+
+        layer->setLb( newNeuron._neuron, _lowerBounds.exists( newNeuron._variable ) ?
+                      _lowerBounds[newNeuron._variable] : FloatUtils::negativeInfinity() );
+        layer->setUb( newNeuron._neuron, _upperBounds.exists( newNeuron._variable ) ?
+                      _upperBounds[newNeuron._variable] : FloatUtils::infinity() );
 
         unsigned sourceLayer = handledVariableToLayer[newNeuron._sourceVariable];
         unsigned sourceNeuron = nlr->getLayer( sourceLayer )->variableToNeuron( newNeuron._sourceVariable );

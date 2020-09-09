@@ -1412,10 +1412,10 @@ void Tableau::harrisRatioTest( double *changeColumn )
                 if ( _costFunctionManager->getOptimize() && linearSolved )
                 {
                     actualLowerBound = _lowerBounds[basic];
-                    if (_basicIndexToVariable[i] == 610)
-                    {
-                        printf("Setting lower bound to: %.10f\n", actualLowerBound);
-                    }
+                    //if (_basicIndexToVariable[i] == 610)
+                    //{
+                    //    printf("Setting lower bound to: %.10f\n", actualLowerBound);
+                    //}
                 }
                 else if ( basicCost < 0 )
                     continue;

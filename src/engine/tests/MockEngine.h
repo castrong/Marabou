@@ -148,12 +148,6 @@ public:
     {
     }
 
-    PiecewiseLinearConstraint *_nextSplitPLConstraint;
-    PiecewiseLinearConstraint *pickSplitPLConstraint()
-    {
-        return _nextSplitPLConstraint;
-    }
-    
     mutable SmtState *lastRestoredSmtState;
     bool restoreSmtState( SmtState &smtState )
     {
@@ -173,7 +167,7 @@ public:
         _constraintsToSplit.append( constraint );
     }
 
-    PiecewiseLinearConstraint *pickSplitPLConstraint( DivideStrategy /**/ )
+    PiecewiseLinearConstraint *pickSplitPLConstraint()
     {
         if ( !_constraintsToSplit.empty() )
         {

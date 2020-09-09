@@ -42,6 +42,11 @@ public:
     void freeMemory();
 
     /*
+      Reset the SmtCore
+    */
+    void reset();
+
+    /*
       Inform the SMT core that a PL constraint is violated.
     */
     void reportViolatedConstraint( PiecewiseLinearConstraint *constraint );
@@ -126,7 +131,7 @@ public:
     bool checkSkewFromDebuggingSolution();
     bool splitAllowsStoredSolution( const PiecewiseLinearCaseSplit &split, String &error ) const;
 
-    void setDivideStrategy(DivideStrategy divideStrategy);
+    //void setDivideStrategy(DivideStrategy divideStrategy);
 
 private:
     /*
