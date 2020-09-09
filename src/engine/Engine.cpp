@@ -48,7 +48,7 @@ Engine::Engine()
     , _verbosity( Options::get()->getInt( Options::VERBOSITY ) )
     , _lastNumVisitedStates( 0 )
     , _lastIterationWithProgress( 0 )
-    , _splittingStrategy( DivideStrategy::None )
+    , _splittingStrategy( GlobalConfiguration::SPLITTING_HEURISTICS )
 {
     _smtCore.setStatistics( &_statistics );
     _tableau->setStatistics( &_statistics );
@@ -97,7 +97,6 @@ void Engine::adjustWorkMemorySize()
 bool Engine::solve( unsigned timeoutInSeconds )
 {
     //printf("Optimize: %d\n", _costFunctionManager->getOptimize());
-    _splittingStrategy = _preprocessedQuery.getDivideStrategy();
     if (_costFunctionManager->getOptimize())
     {
         return optimize( timeoutInSeconds );
@@ -1441,6 +1440,8 @@ bool Engine::processInputQuery( InputQuery &inputQuery, bool preprocess )
         if ( preprocess )
             performMILPSolverBoundedTightening();
 
+        if ( _preprocessedQuery.getDivideStrategy() != DivideStrategy::None )
+            _splittingStrategy = _preprocessedQuery.getDivideStrategy();
         if ( _splittingStrategy == DivideStrategy::Auto )
         {
             _splittingStrategy =
