@@ -162,7 +162,7 @@ void MILPFormulator::optimizeBoundsWithMILPEncoding( const Map<unsigned, Layer *
     {
         Layer *layer = currentLayer.second;
         unsigned layerIndex = layer->getLayerIndex();
-
+	std::cout << "Layer " << layerIndex << std::endl;
         /*
           The optimiziation is performed layer by layer, and for each
           individual neuron. It has 4 steps:
@@ -179,6 +179,8 @@ void MILPFormulator::optimizeBoundsWithMILPEncoding( const Map<unsigned, Layer *
         */
         for ( unsigned i = 0; i < layer->getSize(); ++i )
         {
+	  std::cout << "neuron " << i << std::endl;
+
             if ( layer->neuronEliminated( i ) )
                 continue;
 

@@ -2627,6 +2627,9 @@ bool Engine::tightenVariableBoundOnEquation( const Equation &equation,
     ENGINE_LOG( Stringf( "Variable upperbound before tightening: %f",
                          oldUb ).ascii() );
 
+    if ( FloatUtils::gt( oldLb, oldUb ) )
+      throw InfeasibleQueryException();
+    
     // a v1 + b v2 + c variable = d
     // -> a v1 + b v2 - d = -c variable
     double factor = - equation.getCoefficient( variable ); // -c
@@ -2674,6 +2677,9 @@ bool Engine::tightenVariableBoundOnEquation( const Equation &equation,
     _tableau->tightenLowerBound( variable, lb );
     _tableau->tightenUpperBound( variable, ub );
 
+    if ( FloatUtils::gt( lb, ub ) )
+      throw InfeasibleQueryException();
+    
     ENGINE_LOG( Stringf( "Tightening bounds of x%u on equation - done",
                          variable ).ascii() );
     return tightened;
