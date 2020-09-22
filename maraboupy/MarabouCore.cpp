@@ -131,6 +131,7 @@ struct MarabouOptions {
         , _onlineDivides( Options::get()->getInt( Options::NUM_ONLINE_DIVIDES ) )
         , _verbosity( Options::get()->getInt( Options::VERBOSITY ) )
         , _timeoutInSeconds( Options::get()->getInt( Options::TIMEOUT ) )
+	, _perReLUTimeout( Options::get()->getFloat( Options::PER_RELU_TIMEOUT ) )
         , _timeoutFactor( Options::get()->getFloat( Options::TIMEOUT_FACTOR ) )
         , _optimize( true )
         , _divideStrategy( DivideStrategy::None )
@@ -149,7 +150,8 @@ struct MarabouOptions {
     Options::get()->setInt( Options::NUM_ONLINE_DIVIDES, _onlineDivides );
     Options::get()->setInt( Options::VERBOSITY, _verbosity );
     Options::get()->setInt( Options::TIMEOUT, _timeoutInSeconds );
-
+    Options::get()->setFloat( Options::PER_RELU_TIMEOUT, _perReLUTimeout );
+    
     // float options
     Options::get()->setFloat( Options::TIMEOUT_FACTOR, _timeoutFactor );
 
@@ -164,6 +166,7 @@ struct MarabouOptions {
     unsigned _onlineDivides;
     unsigned _verbosity;
     unsigned _timeoutInSeconds;
+    float _perReLUTimeout;
     float _timeoutFactor;
     bool _optimize;
     DivideStrategy _divideStrategy;
@@ -343,6 +346,7 @@ PYBIND11_MODULE(MarabouCore, m) {
         .def_readwrite("_initialDivides", &MarabouOptions::_initialDivides)
         .def_readwrite("_onlineDivides", &MarabouOptions::_onlineDivides)
         .def_readwrite("_timeoutInSeconds", &MarabouOptions::_timeoutInSeconds)
+        .def_readwrite("_perReLUTimeout", &MarabouOptions::_perReLUTimeout)
         .def_readwrite("_timeoutFactor", &MarabouOptions::_timeoutFactor)
         .def_readwrite("_verbosity", &MarabouOptions::_verbosity)
         .def_readwrite("_dnc", &MarabouOptions::_dnc)

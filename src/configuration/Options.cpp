@@ -55,12 +55,14 @@ void Options::initializeDefaultValues()
     _intOptions[VERBOSITY] = 2;
     _intOptions[TIMEOUT] = 0;
     _intOptions[CONSTRAINT_VIOLATION_THRESHOLD] = 1;
+    _intOptions[PER_RELU_TIMEOUT] = 1;
 
     /*
       Float options
     */
     _floatOptions[TIMEOUT_FACTOR] = 1.5;
-
+    _floatOptions[PER_RELU_TIMEOUT] = 1;
+    
     /*
       String options
     */

@@ -197,13 +197,6 @@ bool Engine::solve( unsigned timeoutInSeconds )
             if ( _smtCore.needToSplit() )
             {
                 _smtCore.performSplit();
-                // update the lower bound for the optimization variable
-                _tableau->tightenLowerBound( _costFunctionManager->getOptimizationVariable(), _bestOptValSoFar );
-                do
-                {
-                    performSymbolicBoundTightening();
-                }
-                while ( applyAllValidConstraintCaseSplits() );
                 continue;
             }
 

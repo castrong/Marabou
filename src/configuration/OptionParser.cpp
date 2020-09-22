@@ -78,6 +78,9 @@ void OptionParser::initialize()
         ( "num-online-divides",
           boost::program_options::value<int>( &((*_intOptions)[Options::NUM_ONLINE_DIVIDES]) ),
           "(DNC) Number of times to further bisect a sub-region when a timeout occurs" )
+	( "per-relu-timeout",
+          boost::program_options::value<int>( &((*_intOptions)[Options::PER_RELU_TIMEOUT]) ),
+          "Per RELU timeout" )
         ( "timeout",
           boost::program_options::value<int>( &((*_intOptions)[Options::TIMEOUT]) ),
           "Global timeout" )

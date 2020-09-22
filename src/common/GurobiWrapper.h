@@ -120,7 +120,8 @@ private:
     GRBEnv *_environment;
     GRBModel *_model;
     Map<String, GRBVar *> _nameToVariable;
-
+    double _timeout;
+    
     void addConstraint( const List<Term> &terms, double scalar, char sense );
 
     void freeModelIfNeeded();
