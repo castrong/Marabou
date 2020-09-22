@@ -145,7 +145,7 @@ public:
 
 private:
     unsigned _numberOfVariables;
-    bool _optimize;
+    bool _optimize = false;
     unsigned _optimizationVariable;
     DivideStrategy _divideStrategy = DivideStrategy::None; // TODO: How to deal with it not being set? 
 
