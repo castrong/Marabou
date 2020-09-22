@@ -22,7 +22,8 @@ try:
 except ImportError:
     warnings.warn("NNet parser is unavailable because the numpy package is not installed")
 try:
-    from maraboupy.MarabouNetworkTF import *
+    #from maraboupy.MarabouNetworkTF import *
+    print("Temporarily removed TF")
 except ImportError:
     warnings.warn("Tensorflow parser is unavailable because tensorflow package is not installed")
 try:
