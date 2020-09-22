@@ -60,11 +60,13 @@ public:
         TIMEOUT,
 
         CONSTRAINT_VIOLATION_THRESHOLD,
+
     };
 
     enum FloatOptions{
         // DNC options
         TIMEOUT_FACTOR,
+	PER_RELU_TIMEOUT,
     };
 
     enum StringOptions {
