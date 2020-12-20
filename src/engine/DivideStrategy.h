@@ -16,15 +16,15 @@
 #ifndef __DivideStrategy_h__
 #define __DivideStrategy_h__
 
-enum DivideStrategy
+enum class DivideStrategy
 {
-    // Input splitting
-    LargestInterval,
-
     // Relu splitting
-    EarliestReLU, // Pick a ReLU that appears in the earliest layer
+    Polarity = 0,      // Pick the ReLU with the polarity closest to 0 among the first K nodes
+    EarliestReLU,  // Pick a ReLU that appears in the earliest layer
     ReLUViolation, // Pick the ReLU that has been violated for the most times
     None,
+    LargestInterval, // Pick the largest interval
+    Auto,
 };
 
 #endif // __DivideStrategy_h__

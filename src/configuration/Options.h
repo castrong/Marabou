@@ -19,6 +19,8 @@
 #include "MString.h"
 #include "Map.h"
 #include "OptionParser.h"
+#include "SnCDivideStrategy.h"
+
 #include "boost/program_options.hpp"
 
 /*
@@ -33,6 +35,9 @@ public:
 
         // Should DNC mode be on or off
         DNC_MODE,
+
+        // Restore tree states of the parent when handling children in DnC.
+        RESTORE_TREE_STATES,
 
         // Help flag
         HELP,
@@ -54,12 +59,14 @@ public:
         // Global timeout
         TIMEOUT,
 
-        SPLIT_THRESHOLD,
+        CONSTRAINT_VIOLATION_THRESHOLD,
+
     };
 
     enum FloatOptions{
         // DNC options
         TIMEOUT_FACTOR,
+	PER_RELU_TIMEOUT,
     };
 
     enum StringOptions {
@@ -67,6 +74,8 @@ public:
         PROPERTY_FILE_PATH,
         INPUT_QUERY_FILE_PATH,
         SUMMARY_FILE,
+        SNC_SPLITTING_STRATEGY,
+        QUERY_DUMP_FILE,
     };
 
     /*
@@ -86,6 +95,27 @@ public:
     int getInt( unsigned option ) const;
     float getFloat( unsigned option ) const;
     String getString( unsigned option ) const;
+    SnCDivideStrategy getSnCDivideStrategy() const;
+
+    /*
+      Retrieve the value of the various options, by type
+    */
+    void setBool( unsigned option, bool );
+    void setInt( unsigned option, int );
+    void setFloat( unsigned option, float );
+    void setString( unsigned option, std::string );
+
+    /*
+      Options that are determined at compile time
+    */
+    bool gurobiEnabled() const
+    {
+#ifdef ENABLE_GUROBI
+        return true;
+#else
+        return false;
+#endif
+    }
 
 private:
     /*

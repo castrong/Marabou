@@ -18,6 +18,7 @@
 
 #include "Map.h"
 #include "PiecewiseLinearConstraint.h"
+#include <cmath>
 
 class ReluConstraint : public PiecewiseLinearConstraint
 {
@@ -34,6 +35,11 @@ public:
     */
     ReluConstraint( unsigned b, unsigned f );
     ReluConstraint( const String &serializedRelu );
+
+    /*
+      Get the type of this constraint.
+    */
+    PiecewiseLinearFunctionType getType() const;
 
     /*
       Return a clone of the constraint.
@@ -146,9 +152,10 @@ public:
     String serializeToString() const;
 
     /*
-      Get the index of the B variable.
+      Get the index of the B and F variables.
     */
     unsigned getB() const;
+    unsigned getF() const;
 
     /*
       Get the current phase status.
@@ -160,12 +167,6 @@ public:
     */
     bool auxVariableInUse() const;
     unsigned getAux() const;
-
-    /*
-      Return true if and only if this piecewise linear constraint supports
-      symbolic bound tightening.
-    */
-    bool supportsSymbolicBoundTightening() const;
 
     bool supportPolarity() const;
 
@@ -189,6 +190,8 @@ public:
     void updateDirection();
 
     PhaseStatus getDirection() const;
+
+    void updateScoreBasedOnPolarity();
 
 private:
     unsigned _b, _f;

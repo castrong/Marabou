@@ -45,6 +45,9 @@ void OptionParser::initialize()
         ( "dnc",
           boost::program_options::bool_switch( &((*_boolOptions)[Options::DNC_MODE]) ),
           "Use the divide-and-conquer solving mode" )
+        ( "restore-tree-states",
+          boost::program_options::bool_switch( &((*_boolOptions)[Options::RESTORE_TREE_STATES]) ),
+          "Restore tree states in dnc mode" )
         ( "input",
           boost::program_options::value<std::string>( &((*_stringOptions)[Options::INPUT_FILE_PATH]) ),
           "Neural netowrk file" )
@@ -57,9 +60,15 @@ void OptionParser::initialize()
         ( "summary-file",
           boost::program_options::value<std::string>( &((*_stringOptions)[Options::SUMMARY_FILE]) ),
           "Summary file" )
+        ( "query-dump-file",
+          boost::program_options::value<std::string>( &((*_stringOptions)[Options::QUERY_DUMP_FILE]) ),
+          "Query dump file" )
         ( "num-workers",
           boost::program_options::value<int>( &((*_intOptions)[Options::NUM_WORKERS]) ),
           "(DNC) Number of workers" )
+        ( "split-strategy",
+          boost::program_options::value<std::string>( &((*_stringOptions)[Options::SNC_SPLITTING_STRATEGY]) ),
+          "The splitting strategy" )
         ( "initial-divides",
           boost::program_options::value<int>( &((*_intOptions)[Options::NUM_INITIAL_DIVIDES]) ),
           "(DNC) Number of times to initially bisect the input region" )
@@ -69,6 +78,9 @@ void OptionParser::initialize()
         ( "num-online-divides",
           boost::program_options::value<int>( &((*_intOptions)[Options::NUM_ONLINE_DIVIDES]) ),
           "(DNC) Number of times to further bisect a sub-region when a timeout occurs" )
+	( "per-relu-timeout",
+          boost::program_options::value<int>( &((*_intOptions)[Options::PER_RELU_TIMEOUT]) ),
+          "Per RELU timeout" )
         ( "timeout",
           boost::program_options::value<int>( &((*_intOptions)[Options::TIMEOUT]) ),
           "Global timeout" )
@@ -77,7 +89,7 @@ void OptionParser::initialize()
           "Verbosity of engine::solve(). 0: does not print anything (for DnC), 1: print"
           "out statistics in the beginning and end, 2: print out statistics during solving." )
         ( "split-threshold",
-          boost::program_options::value<int>( &((*_intOptions)[Options::SPLIT_THRESHOLD]) ),
+          boost::program_options::value<int>( &((*_intOptions)[Options::CONSTRAINT_VIOLATION_THRESHOLD]) ),
           "Max number of tries to repair a relu before splitting" )
         ( "timeout-factor",
           boost::program_options::value<float>( &((*_floatOptions)[Options::TIMEOUT_FACTOR]) ),

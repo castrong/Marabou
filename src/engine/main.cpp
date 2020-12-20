@@ -78,13 +78,13 @@ int main( int argc, char **argv )
         Options *options = Options::get();
         options->parseOptions( argc, argv );
 
-        if (options->getBool( Options::HELP ) )
+        if ( options->getBool( Options::HELP ) )
         {
             printHelpMessage();
             return 0;
         };
 
-        if (options->getBool( Options::VERSION ) )
+        if ( options->getBool( Options::VERSION ) )
         {
             printVersion();
             return 0;
@@ -93,7 +93,7 @@ int main( int argc, char **argv )
         if ( options->getBool( Options::DNC_MODE ) )
             DnCMarabou().run();
         else
-            Marabou( options->getInt( Options::VERBOSITY ) ).run();
+            Marabou().run();
     }
     catch ( const Error &e )
     {

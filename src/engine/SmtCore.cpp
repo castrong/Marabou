@@ -21,6 +21,7 @@
 #include "IEngine.h"
 #include "MStringf.h"
 #include "MarabouError.h"
+#include "Options.h"
 #include "ReluConstraint.h"
 #include "SmtCore.h"
 
@@ -30,8 +31,7 @@ SmtCore::SmtCore( IEngine *engine )
     , _needToSplit( false )
     , _constraintForSplitting( NULL )
     , _stateId( 0 )
-    , _constraintViolationThreshold
-      ( GlobalConfiguration::CONSTRAINT_VIOLATION_THRESHOLD )
+    , _constraintViolationThreshold( Options::get()->getInt( Options::CONSTRAINT_VIOLATION_THRESHOLD ) )
 {
 }
 
@@ -51,6 +51,16 @@ void SmtCore::freeMemory()
     _stack.clear();
 }
 
+void SmtCore::reset()
+{
+    freeMemory();
+    _impliedValidSplitsAtRoot.clear();
+    _needToSplit = false;
+    _constraintForSplitting = NULL;
+    _stateId = 0;
+    _constraintToViolationCount.clear();
+}
+
 void SmtCore::reportViolatedConstraint( PiecewiseLinearConstraint *constraint )
 {
     if ( !_constraintToViolationCount.exists( constraint ) )
@@ -62,15 +72,10 @@ void SmtCore::reportViolatedConstraint( PiecewiseLinearConstraint *constraint )
          _constraintViolationThreshold )
     {
         _needToSplit = true;
-
-        DivideStrategy _strategyToUse = (_divideStrategy == DivideStrategy::None) ? GlobalConfiguration::SPLITTING_HEURISTICS : _divideStrategy;
-
-        if ( _strategyToUse == DivideStrategy::ReLUViolation ) {
+        if ( !pickSplitPLConstraint() )
+            // If pickSplitConstraint failed to pick one, use the native
+            // relu-violation based splitting heuristic.
             _constraintForSplitting = constraint;
-        }
-        else {
-            pickSplitPLConstraint();
-        }
     }
 }
 
@@ -125,7 +130,7 @@ void SmtCore::performSplit()
     ++_stateId;
     _engine->storeState( *stateBeforeSplits, true );
 
-    StackEntry *stackEntry = new StackEntry;
+    SmtStackEntry *stackEntry = new SmtStackEntry;
     // Perform the first split: add bounds and equations
     List<PiecewiseLinearCaseSplit>::iterator split = splits.begin();
     _engine->applySplit( *split );
@@ -148,6 +153,8 @@ void SmtCore::performSplit()
         _statistics->addTimeSmtCore( TimeUtils::timePassed( start, end ) );
     }
 
+    if ( _constraintForSplitting->temporary() )
+        delete _constraintForSplitting;
     _constraintForSplitting = NULL;
 }
 
@@ -158,7 +165,7 @@ unsigned SmtCore::getStackDepth() const
 
 bool SmtCore::popSplit()
 {
-    log( "Performing a pop" );
+    SMT_LOG( "Performing a pop" );
 
     // erasing a split is what is relevant! this is the node we're working on currently though, how to get the one we just finished?
     // can I get that info from the previously active split?
@@ -168,7 +175,7 @@ bool SmtCore::popSplit()
     {
         _statistics->incPercentDone(getStackDepth());
     }
-    
+
     if ( _stack.empty() )
         return false;
 
@@ -208,12 +215,12 @@ bool SmtCore::popSplit()
         throw MarabouError( MarabouError::DEBUGGING_ERROR );
     }
 
-    StackEntry *stackEntry = _stack.back();
+    SmtStackEntry *stackEntry = _stack.back();
 
     // Restore the state of the engine
-    log( "\tRestoring engine state..." );
-    _engine->restoreState( *(stackEntry->_engineState) );
-    log( "\tRestoring engine state - DONE" );
+    SMT_LOG( "\tRestoring engine state..." );
+    _engine->restoreState( *( stackEntry->_engineState ) );
+    SMT_LOG( "\tRestoring engine state - DONE" );
 
     // Apply the new split and erase it from the list
     auto split = stackEntry->_alternativeSplits.begin();
@@ -221,9 +228,9 @@ bool SmtCore::popSplit()
     // Erase any valid splits that were learned using the split we just popped
     stackEntry->_impliedValidSplits.clear();
 
-    log( "\tApplying new split..." );
+    SMT_LOG( "\tApplying new split..." );
     _engine->applySplit( *split );
-    log( "\tApplying new split - DONE" );
+    SMT_LOG( "\tApplying new split - DONE" );
 
     stackEntry->_activeSplit = *split;
     stackEntry->_alternativeSplits.erase( split );
@@ -276,12 +283,6 @@ void SmtCore::allSplitsSoFar( List<PiecewiseLinearCaseSplit> &result ) const
 void SmtCore::setStatistics( Statistics *statistics )
 {
     _statistics = statistics;
-}
-
-void SmtCore::log( const String &message )
-{
-    if ( GlobalConfiguration::SMT_CORE_LOGGING )
-        printf( "SmtCore: %s\n", message.ascii() );
 }
 
 void SmtCore::storeDebuggingSolution( const Map<unsigned, double> &debuggingSolution )
@@ -382,28 +383,6 @@ bool SmtCore::splitAllowsStoredSolution( const PiecewiseLinearCaseSplit &split, 
     return true;
 }
 
-void SmtCore::setConstraintViolationThreshold( unsigned threshold )
-{
-    _constraintViolationThreshold = threshold;
-}
-
-void SmtCore::setDivideStrategy(DivideStrategy divideStrategy)
-{
-    switch(divideStrategy) {
-        case DivideStrategy::EarliestReLU: 
-            _divideStrategy = DivideStrategy::EarliestReLU; 
-            break;
-        case DivideStrategy::ReLUViolation: 
-            _divideStrategy = DivideStrategy::ReLUViolation; 
-            break;
-        case DivideStrategy::LargestInterval: 
-            return;  // This shouldn't be sent, decides input splitting
-        case DivideStrategy::None: 
-            _divideStrategy = DivideStrategy::None; 
-            break;
-    }
-}
-
 PiecewiseLinearConstraint *SmtCore::chooseViolatedConstraintForFixing( List<PiecewiseLinearConstraint *> &_violatedPlConstraints ) const
 {
     ASSERT( !_violatedPlConstraints.empty() );
@@ -437,12 +416,53 @@ PiecewiseLinearConstraint *SmtCore::chooseViolatedConstraintForFixing( List<Piec
     return candidate;
 }
 
-void SmtCore::pickSplitPLConstraint()
+void SmtCore::replaySmtStackEntry( SmtStackEntry *stackEntry )
 {
-    if ( _needToSplit && !_constraintForSplitting )
+    struct timespec start = TimeUtils::sampleMicro();
+
+    if ( _statistics )
     {
-        _constraintForSplitting = _engine->pickSplitPLConstraint();
+        _statistics->incNumSplits();
+        _statistics->incNumVisitedTreeStates();
     }
+
+    // Obtain the current state of the engine
+    EngineState *stateBeforeSplits = new EngineState;
+    stateBeforeSplits->_stateId = _stateId;
+    ++_stateId;
+    _engine->storeState( *stateBeforeSplits, true );
+    stackEntry->_engineState = stateBeforeSplits;
+
+    // Apply all the splits
+    _engine->applySplit( stackEntry->_activeSplit );
+    for ( const auto &impliedSplit : stackEntry->_impliedValidSplits )
+        _engine->applySplit( impliedSplit );
+
+    _stack.append( stackEntry );
+
+    if ( _statistics )
+    {
+        _statistics->setCurrentStackDepth( getStackDepth() );
+        struct timespec end = TimeUtils::sampleMicro();
+        _statistics->addTimeSmtCore( TimeUtils::timePassed( start, end ) );
+    }
+}
+
+void SmtCore::storeSmtState( SmtState &smtState )
+{
+    smtState._impliedValidSplitsAtRoot = _impliedValidSplitsAtRoot;
+
+    for ( auto &stackEntry : _stack )
+        smtState._stack.append( stackEntry->duplicateSmtStackEntry() );
+
+    smtState._stateId = _stateId;
+}
+
+bool SmtCore::pickSplitPLConstraint()
+{
+    if ( _needToSplit )
+        _constraintForSplitting = _engine->pickSplitPLConstraint();
+    return _constraintForSplitting != NULL;
 }
 
 //

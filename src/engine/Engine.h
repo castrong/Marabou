@@ -1,3 +1,4 @@
+
 /*********************                                                        */
 /*! \file Engine.h
  ** \verbatim
@@ -25,6 +26,8 @@
 #include "DantzigsRule.h"
 #include "DegradationChecker.h"
 #include "DivideStrategy.h"
+#include "SnCDivideStrategy.h"
+#include "GlobalConfiguration.h"
 #include "IEngine.h"
 #include "InputQuery.h"
 #include "Map.h"
@@ -40,6 +43,8 @@
 #undef ERROR
 #endif
 
+#define ENGINE_LOG(x, ...) LOG(GlobalConfiguration::ENGINE_LOGGING, "Engine: %s\n", x)
+
 class EngineState;
 class InputQuery;
 class PiecewiseLinearConstraint;
@@ -48,7 +53,7 @@ class String;
 class Engine : public IEngine, public SignalHandler::Signalable
 {
 public:
-    Engine( unsigned verbosity = 2 );
+    Engine();
     ~Engine();
 
     /*
@@ -80,6 +85,8 @@ public:
     /*
       Methods for storing and restoring the state of the engine.
     */
+    void storeTableauState( TableauState &state ) const;
+    void restoreTableauState( const TableauState &state );
     void storeState( EngineState &state, bool storeAlsoTableauState ) const;
     void restoreState( const EngineState &state );
     void setNumPlConstraintsDisabledByValidSplits( unsigned numConstraints );
@@ -135,19 +142,31 @@ public:
     void setVerbosity( unsigned verbosity );
 
     /*
+      Set the internal splitting strategy
+    */
+    void setSplittingStrategy( DivideStrategy strategy );
+
+    /*
+      Apply the stack to the newly created SmtCore, returns false if UNSAT is
+      found in this process.
+    */
+    bool restoreSmtState( SmtState &smtState );
+
+    /*
+      Store the current stack of the smtCore into smtState
+    */
+    void storeSmtState( SmtState &smtState );
+
+    /*
       Pick the piecewise linear constraint for splitting
     */
     PiecewiseLinearConstraint *pickSplitPLConstraint();
 
     /*
-      Update the scores of each candidate splitting PL constraints
+      Call-back from QueryDividers
+      Pick the piecewise linear constraint for splitting
     */
-    void updateScores();
-
-    /*
-      Set the constraint violation threshold of SmtCore
-    */
-    void setConstraintViolationThreshold( unsigned threshold );
+    PiecewiseLinearConstraint *pickSplitPLConstraintSnC( SnCDivideStrategy strategy );
 
     /*
       PSA: The following two methods are for DnC only and should be used very
@@ -171,19 +190,8 @@ private:
     };
 
     bool _noEnteringCandidatesLeft = false;
-    double _bestOptValSoFar = -100000000000;
+    double _bestOptValSoFar = -FloatUtils::infinity();
     Map<unsigned, double> _bestSolutionSoFar;
-
-    // Store the current assignment of input variables into _bestSolutionSoFar
-    // If preprocessing occurred, this backtracks to find which input variables
-    // the current set of variables corresponds to
-    void updateBestSolutionSoFar();
-
-    /*
-      Perform bound tightening operations that require
-      access to the explicit basis matrix.
-    */
-    void explicitBasisBoundTightening();
 
     /*
       Collect and print various statistics.
@@ -199,11 +207,6 @@ private:
       The existing piecewise-linear constraints.
     */
     List<PiecewiseLinearConstraint *> _plConstraints;
-
-    /*
-      The ordered set of candidate PL constraints for splitting
-    */
-    Set<PiecewiseLinearConstraint *> _candidatePlConstraints;
 
     /*
       Piecewise linear constraints that are currently violated.
@@ -312,7 +315,7 @@ private:
       and can be used for various operations such as network
       evaluation of topology-based bound tightening.
      */
-    NetworkLevelReasoner *_networkLevelReasoner;
+    NLR::NetworkLevelReasoner *_networkLevelReasoner;
 
     /*
       Verbosity level:
@@ -331,6 +334,13 @@ private:
     */
     unsigned _lastNumVisitedStates;
     unsigned long long _lastIterationWithProgress;
+
+    List<Equation> _watcherEquations;
+
+    /*
+      Strategy used for internal splitting
+    */
+    DivideStrategy _splittingStrategy;
 
     /*
       Perform a simplex step: compute the cost function, pick the
@@ -426,8 +436,6 @@ private:
     void performPrecisionRestoration( PrecisionRestorer::RestoreBasics restoreBasics );
     bool basisRestorationNeeded() const;
 
-    static void log( const String &message );
-
     /*
       For debugging purposes:
       Check that the current lower and upper bounds are consistent
@@ -481,12 +489,64 @@ private:
     double *createConstraintMatrix();
     void addAuxiliaryVariables();
     void augmentInitialBasisIfNeeded( List<unsigned> &initialBasis, const List<unsigned> &basicRows );
+    void performMILPSolverBoundedTightening();
 
     /*
       Update the preferred direction to perform fixes and the preferred order
       to handle case splits
     */
     void updateDirections();
+
+    /*
+      Among the earliest K ReLUs, pick the one with Polarity closest to 0.
+      K is equal to GlobalConfiguration::POLARITY_CANDIDATES_THRESHOLD
+    */
+    PiecewiseLinearConstraint *pickSplitPLConstraintBasedOnPolarity();
+
+    /*
+      Pick the first unfixed ReLU in the topological order
+    */
+    PiecewiseLinearConstraint *pickSplitPLConstraintBasedOnTopology();
+
+    /*
+      Store a list of equations involving the variable as watchers
+    */
+    void storeWatcherEquations( unsigned variable );
+
+
+    void tightenBoundsOnEquation();
+
+    /*
+      Tighten the bounds of variables in the watcherEquations
+    */
+    void tightenBoundsOnWatcherEquations();
+
+    /*
+      Tighten the bound of each variable in a equation based on the bounds of other variables
+    */
+    bool tightenBoundsOnEquation( const Equation &equation );
+
+    /*
+      Tighten the bound of a variable in a equation based on the bounds of other variables
+    */
+    bool tightenVariableBoundOnEquation( const Equation &equation, unsigned variable );
+
+    // Store the current assignment of input variables into _bestSolutionSoFar
+    // If preprocessing occurred, this backtracks to find which input variables
+    // the current set of variables corresponds to
+    void updateBestSolutionSoFar();
+
+    /*
+      Perform bound tightening operations that require
+      access to the explicit basis matrix.
+    */
+    void explicitBasisBoundTightening();
+
+    /*
+      Pick the input variable with the largest interval
+    */
+    PiecewiseLinearConstraint *pickSplitPLConstraintBasedOnIntervalWidth();
+
 };
 
 #endif // __Engine_h__

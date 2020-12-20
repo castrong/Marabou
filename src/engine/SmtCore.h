@@ -18,9 +18,13 @@
 
 #include "PiecewiseLinearCaseSplit.h"
 #include "PiecewiseLinearConstraint.h"
+#include "SmtState.h"
 #include "Stack.h"
+#include "SmtStackEntry.h"
 #include "Statistics.h"
 #include "DivideStrategy.h"
+
+#define SMT_LOG( x, ... ) LOG( GlobalConfiguration::SMT_CORE_LOGGING, "SmtCore: %s\n", x )
 
 class EngineState;
 class IEngine;
@@ -36,6 +40,11 @@ public:
       Clear the stack.
     */
     void freeMemory();
+
+    /*
+      Reset the SmtCore
+    */
+    void reset();
 
     /*
       Inform the SMT core that a PL constraint is violated.
@@ -100,9 +109,20 @@ public:
     void setConstraintViolationThreshold( unsigned threshold );
 
     /*
-      Pick the piecewise linear constraint for splitting
+      Replay a stackEntry
     */
-    void pickSplitPLConstraint();
+    void replaySmtStackEntry( SmtStackEntry *stackEntry );
+
+    /*
+      Store the current state of the SmtCore into smtState
+    */
+    void storeSmtState( SmtState &smtState );
+
+    /*
+      Pick the piecewise linear constraint for splitting, returns true
+      if a constraint for splitting is successfully picked
+    */
+    bool pickSplitPLConstraint();
 
     /*
       For debugging purposes only - store a correct possible solution
@@ -111,23 +131,9 @@ public:
     bool checkSkewFromDebuggingSolution();
     bool splitAllowsStoredSolution( const PiecewiseLinearCaseSplit &split, String &error ) const;
 
-    void setDivideStrategy(DivideStrategy divideStrategy);
+    //void setDivideStrategy(DivideStrategy divideStrategy);
 
 private:
-    /*
-      A stack entry consists of the engine state before the split,
-      the active split, the alternative splits (in case of backtrack),
-      and also any implied splits that were discovered subsequently.
-    */
-    struct StackEntry
-    {
-    public:
-        PiecewiseLinearCaseSplit _activeSplit;
-        List<PiecewiseLinearCaseSplit> _impliedValidSplits;
-        List<PiecewiseLinearCaseSplit> _alternativeSplits;
-        EngineState *_engineState;
-    };
-
     /*
       Valid splits that were implied by level 0 of the stack.
     */
@@ -141,7 +147,7 @@ private:
     /*
       The case-split stack.
     */
-    List<StackEntry *> _stack;
+    List<SmtStackEntry *> _stack;
 
     /*
       The engine.
@@ -158,8 +164,6 @@ private:
       Count how many times each constraint has been violated.
     */
     Map<PiecewiseLinearConstraint *, unsigned> _constraintToViolationCount;
-
-    static void log( const String &message );
 
     /*
       For debugging purposes only

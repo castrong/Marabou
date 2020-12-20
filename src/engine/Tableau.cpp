@@ -23,8 +23,8 @@
 #include "ICostFunctionManager.h"
 #include "MStringf.h"
 #include "MalformedBasisException.h"
-#include "PiecewiseLinearCaseSplit.h"
 #include "MarabouError.h"
+#include "PiecewiseLinearCaseSplit.h"
 #include "Tableau.h"
 #include "TableauRow.h"
 #include "TableauState.h"
@@ -623,22 +623,28 @@ void Tableau::getEntryCandidates( List<unsigned> &candidates ) const
 void Tableau::getLeavingCandidates( List<unsigned> &candidates) const
 {
     candidates.clear();
-    for (unsigned i = 0; i < _m; ++i) 
+    for (unsigned i = 0; i < _m; ++i)
     {
-        if ( eligibleForLeaving( i ) )
+        if ( eligibleForLeaving() )
         {
             candidates.append( i );
         }
     }
 }
-bool Tableau::eligibleForLeaving( unsigned i) const
+bool Tableau::eligibleForLeaving() const
 {
     // For now, the only one excluded from leaving corresponds to a variable
     // Representing the cost function to optimize
     // We only exclude any when optimizing
-    bool eligible = (basicIndexToVariable(i) != _costFunctionManager->getOptimizationVariable()) 
-        || !(_costFunctionManager->getOptimize());
-    return eligible;
+    // bool eligible = (basicIndexToVariable(i) != _costFunctionManager->getOptimizationVariable())
+    //     || !(_costFunctionManager->getOptimize());
+    // return eligible;
+
+    // if the optimization variable is ever chosen to leave it must be pushed to a bound.
+    // All steps will be nonincreasing on the objective (assuming the goal is to minimize the objective),
+    // so the opt. variable will be pushed to its bound lower (optimum) bound, and thus achieve its optimum
+    // (note) this is flipped from me picturing it as maximization.
+    return true;
 }
 
 void Tableau::setEnteringVariableIndex( unsigned nonBasic )
@@ -734,6 +740,15 @@ bool Tableau::performingFakePivot() const
 
 void Tableau::performPivot()
 {
+    //printf("-----------------------------------------------\n");
+    //bool solvedBefore = !existsBasicOutOfBounds();
+    //printf("Linear solved START of pivot: %d \n", solvedBefore);
+
+
+    bool decrease;
+    unsigned  nonBasic;
+    (void) decrease;
+    (void) nonBasic;
     if ( _leavingVariable == _m )
     {
 
@@ -745,15 +760,15 @@ void Tableau::performPivot()
         ASSERT( ( enteringReducedCost <= -GlobalConfiguration::ENTRY_ELIGIBILITY_TOLERANCE ) ||
                 ( enteringReducedCost >= +GlobalConfiguration::ENTRY_ELIGIBILITY_TOLERANCE ) );
 
-        bool decrease = ( enteringReducedCost >= +GlobalConfiguration::ENTRY_ELIGIBILITY_TOLERANCE );
-        unsigned nonBasic = _nonBasicIndexToVariable[_enteringVariable];
+        decrease = ( enteringReducedCost >= +GlobalConfiguration::ENTRY_ELIGIBILITY_TOLERANCE );
+        nonBasic = _nonBasicIndexToVariable[_enteringVariable];
 
-        log( Stringf( "Performing 'fake' pivot. Variable x%u jumping to %s bound",
+        TABLEAU_LOG( Stringf( "Performing 'fake' pivot. Variable x%u jumping to %s bound",
                       _nonBasicIndexToVariable[_enteringVariable],
-                      decrease ? "LOWER" : "UPPER" ) );
-        log( Stringf( "Current value: %.3lf. Range: [%.3lf, %.3lf]\n",
+                      decrease ? "LOWER" : "UPPER" ).ascii() );
+        TABLEAU_LOG( Stringf( "Current value: %.3lf. Range: [%.3lf, %.3lf]\n",
                       _nonBasicAssignment[_enteringVariable],
-                      _lowerBounds[nonBasic], _upperBounds[nonBasic] ) );
+                      _lowerBounds[nonBasic], _upperBounds[nonBasic] ).ascii() );
 
         updateAssignmentForPivot();
 
@@ -773,40 +788,37 @@ void Tableau::performPivot()
 
 
     //_costFunctionManager->dumpCostFunction();
-    //dumpAssignment();
 
-    /*
-    printf("Tableau performing pivot. Entering: %u, Leaving: %u\n",
+    // printf("Tableau performing pivot. Entering: %u, Leaving: %u\n",
+    //               _nonBasicIndexToVariable[_enteringVariable],
+    //               _basicIndexToVariable[_leavingVariable] );
+    //
+    // printf("Leaving variable %s. Current value: %.15lf. Range: [%.15lf, %.15lf]\n",
+    //               _leavingVariableIncreases ? "increases" : "decreases",
+    //               _basicAssignment[_leavingVariable],
+    //               _lowerBounds[currentBasic], _upperBounds[currentBasic] );
+    //
+    // printf("Entering variable %s. Current value: %.15lf. Range: [%.15lf, %.15lf]\n",
+    //               FloatUtils::isNegative( _costFunctionManager->getCostFunction()[_enteringVariable] ) ?
+    //               "increases" : "decreases",
+    //               _nonBasicAssignment[_enteringVariable],
+    //               _lowerBounds[currentNonBasic], _upperBounds[currentNonBasic] );
+    // printf("Change ratio is: %.15lf\n", _changeRatio );
+
+
+    TABLEAU_LOG( Stringf( "Tableau performing pivot. Entering: %u, Leaving: %u",
                   _nonBasicIndexToVariable[_enteringVariable],
-                  _basicIndexToVariable[_leavingVariable] );
-
-    printf("Leaving variable %s. Current value: %.15lf. Range: [%.15lf, %.15lf]\n",
+                  _basicIndexToVariable[_leavingVariable] ).ascii() );
+    TABLEAU_LOG( Stringf( "Leaving variable %s. Current value: %.15lf. Range: [%.15lf, %.15lf]",
                   _leavingVariableIncreases ? "increases" : "decreases",
                   _basicAssignment[_leavingVariable],
-                  _lowerBounds[currentBasic], _upperBounds[currentBasic] );
-
-    printf("Entering variable %s. Current value: %.15lf. Range: [%.15lf, %.15lf]\n",
+                  _lowerBounds[currentBasic], _upperBounds[currentBasic] ).ascii() );
+    TABLEAU_LOG( Stringf( "Entering variable %s. Current value: %.15lf. Range: [%.15lf, %.15lf]",
                   FloatUtils::isNegative( _costFunctionManager->getCostFunction()[_enteringVariable] ) ?
                   "increases" : "decreases",
                   _nonBasicAssignment[_enteringVariable],
-                  _lowerBounds[currentNonBasic], _upperBounds[currentNonBasic] );
-    printf("Change ratio is: %.15lf\n", _changeRatio );
-
-
-    log( Stringf( "Tableau performing pivot. Entering: %u, Leaving: %u",
-                  _nonBasicIndexToVariable[_enteringVariable],
-                  _basicIndexToVariable[_leavingVariable] ) );
-    log( Stringf( "Leaving variable %s. Current value: %.15lf. Range: [%.15lf, %.15lf]",
-                  _leavingVariableIncreases ? "increases" : "decreases",
-                  _basicAssignment[_leavingVariable],
-                  _lowerBounds[currentBasic], _upperBounds[currentBasic] ) );
-    log( Stringf( "Entering variable %s. Current value: %.15lf. Range: [%.15lf, %.15lf]",
-                  FloatUtils::isNegative( _costFunctionManager->getCostFunction()[_enteringVariable] ) ?
-                  "increases" : "decreases",
-                  _nonBasicAssignment[_enteringVariable],
-                  _lowerBounds[currentNonBasic], _upperBounds[currentNonBasic] ) );
-    log( Stringf( "Change ratio is: %.15lf\n", _changeRatio ) );
-    */
+                  _lowerBounds[currentNonBasic], _upperBounds[currentNonBasic] ).ascii() );
+    TABLEAU_LOG( Stringf( "Change ratio is: %.15lf\n", _changeRatio ).ascii() );
 
     // As part of the pivot operation we use both the pivot row and
     // pivot column. If they don't agree on the intersection, there's some
@@ -815,11 +827,7 @@ void Tableau::performPivot()
     double pivotEntryByRow = _pivotRow->_row[_enteringVariable]._coefficient;
     if ( !FloatUtils::isZero( pivotEntryByRow - pivotEntryByColumn, GlobalConfiguration::PIVOT_ROW_AND_COLUMN_TOLERANCE ) )
         throw MalformedBasisException();
-/*
 
-    printf("ASSIGNMENT AFTER PIVOT");
-    dumpAssignment();
-*/
 
     updateAssignmentForPivot();
     updateCostFunctionForPivot();
@@ -851,6 +859,22 @@ void Tableau::performPivot()
         struct timespec pivotEnd = TimeUtils::sampleMicro();
         _statistics->addTimePivots( TimeUtils::timePassed( pivotStart, pivotEnd ) );
     }
+
+    //bool solvedAfter = !existsBasicOutOfBounds();
+    //printf("Linear solved END of pivot: %d\n", solvedAfter);
+
+
+
+    // if (solvedAfter == false && solvedBefore == true)
+    // {
+    //     printf("!!!!!!!!!!!!!!!!!!!!! SWITCHED FROM LINEAR SOLVED TO NOT SOLVED !!!!!!!!!!!!!!!!!!!!");
+    //     dumpAssignment();
+    //     throw MarabouError( MarabouError::DEBUGGING_ERROR );
+    // }
+    //
+    // // We should never leave the feasible region from a pivot
+    // ASSERT (!(solvedAfter == false && solvedBefore == true));
+
 }
 
 void Tableau::performDegeneratePivot()
@@ -921,7 +945,14 @@ double Tableau::ratioConstraintPerBasic( unsigned basicIndex, double coefficient
     {
         // Basic variable is decreasing
         double actualLowerBound;
-        if ( basicCost > 0 )
+        // If optimizing and the linear portion is solved, then all are within their bounds
+        // even if they have a non-zero basicCost. The only one with a non-zero basic cost
+        // should be the optimization variable.
+        if ( _costFunctionManager->getOptimize() && !existsBasicOutOfBounds())
+        {
+            actualLowerBound = _lowerBounds[basic];
+        }
+        else if ( basicCost > 0 )
         {
             actualLowerBound = _upperBounds[basic];
         }
@@ -954,7 +985,14 @@ double Tableau::ratioConstraintPerBasic( unsigned basicIndex, double coefficient
     {
         // Basic variable is increasing
         double actualUpperBound;
-        if ( basicCost < 0 )
+        // If optimizing and the linear portion is solved, then all are within their bounds
+        // even if they have a non-zero basicCost. The only one with a non-zero basic cost
+        // should be the optimization variable.
+        if ( _costFunctionManager->getOptimize() && !existsBasicOutOfBounds())
+        {
+            actualUpperBound = _upperBounds[basic];
+        }
+        else if ( basicCost < 0 )
         {
             actualUpperBound = _lowerBounds[basic];
         }
@@ -993,7 +1031,8 @@ void Tableau::pickLeavingVariable()
 {
     pickLeavingVariable( _changeColumn );
     // Assert that if we're optimizing, the leaving variable cant be equal to the optimization variable since it has to stay in the basis.
-    ASSERT(_costFunctionManager->getOptimize() ? (_leavingVariable != variableToIndex(_costFunctionManager->getOptimizationVariable())) : true);
+    // We no longer have to have it stay in the basis
+    //ASSERT(_costFunctionManager->getOptimize() ? (_leavingVariable != variableToIndex(_costFunctionManager->getOptimizationVariable())) : true);
 }
 
 void Tableau::pickLeavingVariable( double *changeColumn )
@@ -1029,7 +1068,6 @@ void Tableau::standardRatioTest( double *changeColumn )
     // A marker to show that no leaving variable has been selected
     _leavingVariable = _m;
 
-    printf("Leaving variable start: %d\n", _leavingVariable);
     // Possible leaving variables to consider - not the variable index, but their index in terms of
     // numbering each of the basic variables
     List<unsigned> leavingVariableCandidates;
@@ -1060,8 +1098,6 @@ void Tableau::standardRatioTest( double *changeColumn )
                     _changeRatio = ratio;
                     _leavingVariable = i;
                     largestPivot = FloatUtils::abs( changeColumn[i] );
-                    printf("setting leaving variable to: %d\n", _leavingVariable);
-
                 }
             }
         }
@@ -1094,8 +1130,6 @@ void Tableau::standardRatioTest( double *changeColumn )
                     _changeRatio = ratio;
                     _leavingVariable = i;
                     largestPivot = FloatUtils::abs( changeColumn[i] );
-                    printf("setting leaving variable to: %d\n", _leavingVariable);
-
                 }
             }
         }
@@ -1122,6 +1156,13 @@ void Tableau::harrisRatioTest( double *changeColumn )
 
     ASSERT( !FloatUtils::isZero( _costFunctionManager->getCostFunction()[_enteringVariable] ) );
 
+    bool linearSolved = _costFunctionManager->getLinearSolved();
+    // Possible leaving variables to consider - not the variable index, but their index in terms of
+    // numbering each of the basic variables
+    List<unsigned> leavingVariableCandidates;
+    getLeavingCandidates(leavingVariableCandidates);
+
+
     // Is the entering variable decreasing?
     bool enteringDecreases = FloatUtils::isPositive( _costFunctionManager->getCostFunction()[_enteringVariable] );
 
@@ -1137,11 +1178,6 @@ void Tableau::harrisRatioTest( double *changeColumn )
                          "Error! Entering variable needs to increase but is at its upper bound" );
             }
         });
-
-    // Possible leaving variables to consider - not the variable index, but their index in terms of
-    // numbering each of the basic variables
-    List<unsigned> leavingVariableCandidates;
-    getLeavingCandidates(leavingVariableCandidates);
 
     /*
       Alfa:
@@ -1163,7 +1199,7 @@ void Tableau::harrisRatioTest( double *changeColumn )
         // variable and see if any of them imposes a tighter
         // constraint.
         double ratioConstraintPerBasic;
-        for ( unsigned i :  leavingVariableCandidates )
+        for ( unsigned i = 0; i < _m; ++i )
         {
             unsigned basic = _basicIndexToVariable[i];
             double basicCost = _costFunctionManager->getBasicCost( i );
@@ -1171,7 +1207,14 @@ void Tableau::harrisRatioTest( double *changeColumn )
             {
                 // Nonbasic decreases, basic increases
                 double actualUpperBound;
-                if ( basicCost > 0 )
+                // If optimizing and the linear portion is solved, then all are within their bounds
+                // even if they have a non-zero basicCost. The only one with a non-zero basic cost
+                // should be the optimization variable.
+                if ( _costFunctionManager->getOptimize() && linearSolved )
+                {
+                    actualUpperBound = _upperBounds[basic];
+                }
+                else if ( basicCost > 0 )
                     continue;
                 else if ( basicCost < 0 )
                     actualUpperBound = _lowerBounds[basic];
@@ -1190,7 +1233,14 @@ void Tableau::harrisRatioTest( double *changeColumn )
             {
                 // Nonbasic decreases, basic decreases
                 double actualLowerBound;
-                if ( basicCost < 0 )
+                // If optimizing and the linear portion is solved, then all are within their bounds
+                // even if they have a non-zero basicCost. The only one with a non-zero basic cost
+                // should be the optimization variable.
+                if ( _costFunctionManager->getOptimize() && linearSolved )
+                {
+                    actualLowerBound = _lowerBounds[basic];
+                }
+                else if ( basicCost < 0 )
                     continue;
                 else if ( basicCost > 0 )
                     actualLowerBound = _upperBounds[basic];
@@ -1227,7 +1277,7 @@ void Tableau::harrisRatioTest( double *changeColumn )
         // variable and see if any of them imposes a tighter
         // constraint.
         double ratioConstraintPerBasic;
-        for ( unsigned i :  leavingVariableCandidates )
+        for ( unsigned i = 0; i < _m; ++i )
         {
             unsigned basic = _basicIndexToVariable[i];
             double basicCost = _costFunctionManager->getBasicCost( i );
@@ -1235,7 +1285,14 @@ void Tableau::harrisRatioTest( double *changeColumn )
             {
                 // Nonbasic increases, basic decreases
                 double actualLowerBound;
-                if ( basicCost < 0 )
+                // If optimizing and the linear portion is solved, then all are within their bounds
+                // even if they have a non-zero basicCost. The only one with a non-zero basic cost
+                // should be the optimization variable.
+                if ( _costFunctionManager->getOptimize() && linearSolved )
+                {
+                    actualLowerBound = _lowerBounds[basic];
+                }
+                else if ( basicCost < 0 )
                     continue;
                 else if ( basicCost > 0 )
                     actualLowerBound = _upperBounds[basic];
@@ -1254,7 +1311,14 @@ void Tableau::harrisRatioTest( double *changeColumn )
             {
                 // Nonbasic increases, basic increases
                 double actualUpperBound;
-                if ( basicCost > 0 )
+                // If optimizing and the linear portion is solved, then all are within their bounds
+                // even if they have a non-zero basicCost. The only one with a non-zero basic cost
+                // should be the optimization variable.
+                if ( _costFunctionManager->getOptimize() && linearSolved )
+                {
+                    actualUpperBound = _upperBounds[basic];
+                }
+                else if ( basicCost > 0 )
                     continue;
                 else if ( basicCost < 0 )
                     actualUpperBound = _lowerBounds[basic];
@@ -1322,7 +1386,14 @@ void Tableau::harrisRatioTest( double *changeColumn )
             {
                 // Nonbasic decreases, basic increases
                 double actualUpperBound;
-                if ( basicCost > 0 )
+                // If optimizing and the linear portion is solved, then all are within their bounds
+                // even if they have a non-zero basicCost. The only one with a non-zero basic cost
+                // should be the optimization variable.
+                if ( _costFunctionManager->getOptimize() && linearSolved )
+                {
+                    actualUpperBound = _upperBounds[basic];
+                }
+                else if ( basicCost > 0 )
                     continue;
                 else if ( basicCost < 0 )
                     actualUpperBound = _lowerBounds[basic];
@@ -1335,7 +1406,18 @@ void Tableau::harrisRatioTest( double *changeColumn )
             {
                 // Nonbasic decreases, basic decreases
                 double actualLowerBound;
-                if ( basicCost < 0 )
+                // If optimizing and the linear portion is solved, then all are within their bounds
+                // even if they have a non-zero basicCost. The only one with a non-zero basic cost
+                // should be the optimization variable.
+                if ( _costFunctionManager->getOptimize() && linearSolved )
+                {
+                    actualLowerBound = _lowerBounds[basic];
+                    //if (_basicIndexToVariable[i] == 610)
+                    //{
+                    //    printf("Setting lower bound to: %.10f\n", actualLowerBound);
+                    //}
+                }
+                else if ( basicCost < 0 )
                     continue;
                 else if ( basicCost > 0 )
                     actualLowerBound = _upperBounds[basic];
@@ -1384,7 +1466,14 @@ void Tableau::harrisRatioTest( double *changeColumn )
             {
                 // Nonbasic increases, basic decreases
                 double actualLowerBound;
-                if ( basicCost < 0 )
+                // If optimizing and the linear portion is solved, then all are within their bounds
+                // even if they have a non-zero basicCost. The only one with a non-zero basic cost
+                // should be the optimization variable.
+                if ( _costFunctionManager->getOptimize() && linearSolved )
+                {
+                    actualLowerBound = _lowerBounds[basic];
+                }
+                else if ( basicCost < 0 )
                     continue;
                 else if ( basicCost > 0 )
                     actualLowerBound = _upperBounds[basic];
@@ -1397,7 +1486,14 @@ void Tableau::harrisRatioTest( double *changeColumn )
             {
                 // Nonbasic decreases, basic decreases
                 double actualUpperBound;
-                if ( basicCost > 0 )
+                // If optimizing and the linear portion is solved, then all are within their bounds
+                // even if they have a non-zero basicCost. The only one with a non-zero basic cost
+                // should be the optimization variable.
+                if ( _costFunctionManager->getOptimize() && linearSolved )
+                {
+                    actualUpperBound = _upperBounds[basic];
+                }
+                else if ( basicCost > 0 )
                     continue;
                 else if ( basicCost < 0 )
                     actualUpperBound = _lowerBounds[basic];
@@ -1889,7 +1985,7 @@ unsigned Tableau::addEquation( const Equation &equation )
 
     if ( !FloatUtils::isZero( _b[_m - 1] ) )
         _rhsIsAllZeros = false;
-    
+
     /*
       Attempt to make the auxiliary variable the new basic variable.
       This usually works.
@@ -1932,7 +2028,7 @@ unsigned Tableau::addEquation( const Equation &equation )
     else
     {
         ConstraintMatrixAnalyzer analyzer;
-        analyzer.analyze( _A, _m, _n );
+        analyzer.analyze( (const SparseUnsortedList **)_sparseRowsOfA, _m, _n );
         List<unsigned> independentColumns = analyzer.getIndependentColumns();
 
         try
@@ -1941,7 +2037,7 @@ unsigned Tableau::addEquation( const Equation &equation )
         }
         catch ( MalformedBasisException & )
         {
-            log( "addEquation failed - could not refactorize basis" );
+            TABLEAU_LOG( "addEquation failed - could not refactorize basis" );
             throw MarabouError( MarabouError::FAILURE_TO_ADD_NEW_EQUATION );
         }
 
@@ -2219,12 +2315,6 @@ void Tableau::setStatistics( Statistics *statistics )
     _statistics = statistics;
 }
 
-void Tableau::log( const String &message )
-{
-    if ( GlobalConfiguration::TABLEAU_LOGGING )
-        printf( "Tableau: %s\n", message.ascii() );
-}
-
 void Tableau::verifyInvariants()
 {
     // All merged variables are non-basic
@@ -2421,10 +2511,24 @@ void Tableau::updateAssignmentForPivot()
                 basicGoingToUpperBound = false;
         }
 
+        bool linearSolved = _costFunctionManager->getLinearSolved();
+
         if ( basicGoingToUpperBound )
+        {
             basicDelta = _upperBounds[currentBasic] - currentBasicValue;
+            if ( basicDelta < 0 && linearSolved )
+            {
+                basicDelta = 0;
+            }
+        }
         else
+        {
             basicDelta = _lowerBounds[currentBasic] - currentBasicValue;
+            if ( basicDelta > 0 && linearSolved )
+            {
+                basicDelta = 0;
+            }
+        }
 
         // Now that we know by how much the leaving variable changes,
         // we can calculate by how much the entering variable is going

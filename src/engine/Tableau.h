@@ -26,6 +26,8 @@
 #include "SparseUnsortedList.h"
 #include "Statistics.h"
 
+#define TABLEAU_LOG( x, ... ) LOG( GlobalConfiguration::TABLEAU_LOGGING, "Tableau: %s\n", x )
+
 class Equation;
 class ICostFunctionManager;
 class PiecewiseLinearCaseSplit;
@@ -206,7 +208,7 @@ public:
       Picks the entering variable.
     */
     bool eligibleForEntry( unsigned nonBasic, const double *costFunction ) const;
-    bool eligibleForLeaving( unsigned i ) const;
+    bool eligibleForLeaving( ) const;
 
     unsigned getEnteringVariable() const;
     unsigned getEnteringVariableIndex() const;
@@ -635,8 +637,6 @@ private:
     */
     void standardRatioTest( double *changeColumn );
     void harrisRatioTest( double *changeColumn );
-
-    static void log( const String &message );
 
     /*
       For debugging purposes only

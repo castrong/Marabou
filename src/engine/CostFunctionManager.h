@@ -39,6 +39,8 @@ public:
     void setOptimize( bool optimize );
     void setOptimizationVariable( unsigned variable );
     bool getOptimize();
+    bool getLinearSolved();
+    
     unsigned getOptimizationVariable();
     void updateLinearSolved();
 

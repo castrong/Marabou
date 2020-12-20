@@ -57,6 +57,7 @@ public:
     virtual void setOptimizationVariable( unsigned variable ) = 0;
     virtual bool getOptimize() = 0;
     virtual unsigned getOptimizationVariable() = 0;
+    virtual bool getLinearSolved() = 0;
 
 };
 

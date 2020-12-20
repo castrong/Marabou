@@ -149,6 +149,10 @@ public:
     {
         return -1;
     }
+		bool getLinearSolved()
+		{
+			return false;
+		}
 
     void updateLinearSolved()
     {

@@ -33,6 +33,12 @@ public:
       f = | b |
     */
     AbsoluteValueConstraint( unsigned b, unsigned f );
+    AbsoluteValueConstraint( const String &serializedAbs );
+
+    /*
+      Get the type of this constraint.
+    */
+    PiecewiseLinearFunctionType getType() const;
 
     /*
       Return a clone of the constraint.
@@ -122,29 +128,36 @@ public:
     void getEntailedTightenings( List<Tightening> &tightenings ) const;
 
     /*
-      For preprocessing: get any auxiliary equations that this
-      constraint would like to add to the equation pool. In the ReLU
-      case, this is an equation of the form aux = f - b, where aux is
-      non-negative.
+      Dump the current state of the constraint.
     */
-    void getAuxiliaryEquations( List<Equation> &newEquations ) const;
+    void dump( String &output ) const;
+
+    /*
+      For preprocessing: get any auxiliary equations that this constraint would
+      like to add to the equation pool.
+    */
+    void addAuxiliaryEquations( InputQuery &inputQuery );
 
     /*
       Returns string with shape: absoluteValue,_f,_b
      */
     String serializeToString() const;
 
-    /*
-      Return true if and only if this piecewise linear constraint supports
-      symbolic bound tightening.
-    */
-    bool supportsSymbolicBoundTightening() const;
+    inline unsigned getB() const { return _b; };
+
+    inline unsigned getF() const { return _f; };
 
 private:
     /*
       The variables that make up this constraint; _f = | _b |.
     */
     unsigned _b, _f;
+
+    /*
+      Auxiliary variables
+    */
+    unsigned _posAux, _negAux;
+    bool _auxVarsInUse;
 
     /*
       True iff _b or _f have been eliminated.
@@ -157,6 +170,8 @@ private:
     */
     PhaseStatus _phaseStatus;
     void setPhaseStatus( PhaseStatus phaseStatus );
+
+    static String phaseToString( PhaseStatus phase );
 
     /*
       The two case splits.

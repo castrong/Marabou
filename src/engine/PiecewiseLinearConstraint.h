@@ -21,6 +21,7 @@
 #include "List.h"
 #include "Map.h"
 #include "PiecewiseLinearCaseSplit.h"
+#include "PiecewiseLinearFunctionType.h"
 #include "Queue.h"
 #include "Tightening.h"
 
@@ -64,6 +65,11 @@ public:
     {
         return _score < other._score;
     }
+
+    /*
+      Get the type of this constraint.
+    */
+    virtual PiecewiseLinearFunctionType getType() const = 0;
 
     /*
       Return a clone of the constraint.
@@ -201,15 +207,6 @@ public:
 
     /*
       Return true if and only if this piecewise linear constraint supports
-      symbolic bound tightening.
-    */
-    virtual bool supportsSymbolicBoundTightening() const
-    {
-        return false;
-    }
-
-    /*
-      Return true if and only if this piecewise linear constraint supports
       the polarity metric
     */
     virtual bool supportPolarity() const
@@ -224,7 +221,13 @@ public:
     {
     }
 
-    virtual void updateScore()
+    double getScore() const
+    {
+        return _score;
+    }
+
+
+    virtual void updateScoreBasedOnPolarity()
     {
     }
 
@@ -249,7 +252,18 @@ public:
         return _upperBounds[i];
     }
 
+    bool temporary() const
+    {
+        return _temporary;
+    }
+
+    void setTemporary( bool isTemporary )
+    {
+        _temporary = isTemporary;
+    }
+
 protected:
+    bool _temporary;
     bool _constraintActive;
 	Map<unsigned, double> _assignment;
     Map<unsigned, double> _lowerBounds;

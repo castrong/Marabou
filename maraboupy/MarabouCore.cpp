@@ -2,7 +2,7 @@
 /*! \file MarabouCore.cpp
  ** \verbatim
  ** Top contributors (to current version):
- **   Christopher Lazarus, Andrew Wu, Shantanu Thakoor
+ **   Christopher Lazarus, Andrew Wu, Shantanu Thakoor, Kyle Julian
  ** This file is part of the Marabou project.
  ** Copyright (c) 2017-2019 by the authors listed in the file AUTHORS
  ** in the top-level source directory) and their institutional affiliations.
@@ -32,12 +32,15 @@
 #include "MarabouError.h"
 #include "MString.h"
 #include "MaxConstraint.h"
+#include "Options.h"
 #include "PiecewiseLinearConstraint.h"
 #include "PropertyParser.h"
 #include "QueryLoader.h"
 #include "ReluConstraint.h"
 #include "Set.h"
 #include "DivideStrategy.h"
+#include "SnCDivideStrategy.h"
+#include "SignConstraint.h"
 
 #ifdef _WIN32
 #define STDOUT_FILENO 1
@@ -89,12 +92,21 @@ void addReluConstraint(InputQuery& ipq, unsigned var1, unsigned var2){
     ipq.addPiecewiseLinearConstraint(r);
 }
 
+void addSignConstraint(InputQuery& ipq, unsigned var1, unsigned var2){
+    PiecewiseLinearConstraint* r = new SignConstraint(var1, var2);
+    ipq.addPiecewiseLinearConstraint(r);
+}
+
 void addMaxConstraint(InputQuery& ipq, std::set<unsigned> elements, unsigned v){
     Set<unsigned> e;
     for(unsigned var: elements)
         e.insert(var);
     PiecewiseLinearConstraint* m = new MaxConstraint(v, e);
     ipq.addPiecewiseLinearConstraint(m);
+}
+
+void addAbsConstraint(InputQuery& ipq, unsigned b, unsigned f){
+    ipq.addPiecewiseLinearConstraint(new AbsoluteValueConstraint(b, f));
 }
 
 void createInputQuery(InputQuery &inputQuery, std::string networkFilePath, std::string propertyFilePath){
@@ -112,35 +124,60 @@ void createInputQuery(InputQuery &inputQuery, std::string networkFilePath, std::
 
 struct MarabouOptions {
     MarabouOptions()
-        : _numWorkers( 4 )
-        , _initialTimeout( 5 )
-        , _initialDivides( 0 )
-        , _onlineDivides( 2 )
-        , _timeoutInSeconds( 0 )
-        , _timeoutFactor( 1.5 )
-        , _verbosity( 2 )
-        , _dnc( false )
-        , _optimize( false )
+        : _dnc( Options::get()->getBool( Options::DNC_MODE ) )
+        , _numWorkers( Options::get()->getInt( Options::NUM_WORKERS ) )
+        , _initialTimeout( Options::get()->getInt( Options::INITIAL_TIMEOUT ) )
+        , _initialDivides( Options::get()->getInt( Options::NUM_INITIAL_DIVIDES ) )
+        , _onlineDivides( Options::get()->getInt( Options::NUM_ONLINE_DIVIDES ) )
+        , _verbosity( Options::get()->getInt( Options::VERBOSITY ) )
+        , _timeoutInSeconds( Options::get()->getInt( Options::TIMEOUT ) )
+	, _perReLUTimeout( Options::get()->getFloat( Options::PER_RELU_TIMEOUT ) )
+        , _timeoutFactor( Options::get()->getFloat( Options::TIMEOUT_FACTOR ) )
+        , _optimize( true )
         , _divideStrategy( DivideStrategy::None )
+        , _sncSplittingStrategyString( Options::get()->getString( Options::SNC_SPLITTING_STRATEGY ).ascii() )
     {};
 
+  void setOptions()
+  {
+    // Bool options
+    Options::get()->setBool( Options::DNC_MODE, _dnc );
+
+    // int options
+    Options::get()->setInt( Options::NUM_WORKERS, _numWorkers );
+    Options::get()->setInt( Options::INITIAL_TIMEOUT, _initialTimeout );
+    Options::get()->setInt( Options::NUM_INITIAL_DIVIDES, _initialDivides );
+    Options::get()->setInt( Options::NUM_ONLINE_DIVIDES, _onlineDivides );
+    Options::get()->setInt( Options::VERBOSITY, _verbosity );
+    Options::get()->setInt( Options::TIMEOUT, _timeoutInSeconds );
+    Options::get()->setFloat( Options::PER_RELU_TIMEOUT, _perReLUTimeout );
+    
+    // float options
+    Options::get()->setFloat( Options::TIMEOUT_FACTOR, _timeoutFactor );
+
+    // string options
+    Options::get()->setString( Options::SNC_SPLITTING_STRATEGY, _sncSplittingStrategyString );
+  }
+
+    bool _dnc;
     unsigned _numWorkers;
     unsigned _initialTimeout;
     unsigned _initialDivides;
     unsigned _onlineDivides;
-    unsigned _timeoutInSeconds;
-    float _timeoutFactor;
     unsigned _verbosity;
-    bool _dnc;
+    unsigned _timeoutInSeconds;
+    float _perReLUTimeout;
+    float _timeoutFactor;
     bool _optimize;
     DivideStrategy _divideStrategy;
+    std::string _sncSplittingStrategyString;
 };
 
 /* The default parameters here are just for readability, you should specify
  * them in the to make them work*/
 std::pair<std::map<int, double>, Statistics> solve(InputQuery &inputQuery, MarabouOptions &options,
                                                    std::string redirect=""){
-    
+
     // Arguments: InputQuery object, filename to redirect output
     // Returns: map from variable number to value
     std::map<int, double> ret;
@@ -149,47 +186,39 @@ std::pair<std::map<int, double>, Statistics> solve(InputQuery &inputQuery, Marab
     if(redirect.length()>0)
         output=redirectOutputToFile(redirect);
     try{
-        bool verbosity = options._verbosity;
-        unsigned timeoutInSeconds = options._timeoutInSeconds;
-        bool dnc = options._dnc;
+
+        options.setOptions();
+
+        bool dnc = Options::get()->getBool( Options::DNC_MODE );
 
         Engine engine;
-        engine.setVerbosity(verbosity);
         if(!engine.processInputQuery(inputQuery)) return std::make_pair(ret, *(engine.getStatistics()));
 
         if ( dnc )
         {
-            unsigned initialDivides = options._initialDivides;
-            unsigned initialTimeout = options._initialTimeout;
-            unsigned numWorkers = options._numWorkers;
-            unsigned onlineDivides = options._onlineDivides;
-            float timeoutFactor = options._timeoutFactor;
+            auto dncManager = std::unique_ptr<DnCManager>( new DnCManager( &inputQuery ) );
 
-            auto dncManager = std::unique_ptr<DnCManager>
-                ( new DnCManager( numWorkers, initialDivides, initialTimeout, onlineDivides,
-                                  timeoutFactor, DivideStrategy::LargestInterval,
-                                  &inputQuery, verbosity ) );
-
-            dncManager->solve( timeoutInSeconds );
+            dncManager->solve();
             switch ( dncManager->getExitCode() )
             {
             case DnCManager::SAT:
             {
                 retStats = Statistics();
-                dncManager->getSolution( ret );
+                dncManager->getSolution( ret, inputQuery );
                 break;
             }
             case DnCManager::TIMEOUT:
             {
                 retStats = Statistics();
                 retStats.timeout();
-                return std::make_pair( ret, Statistics() );
+                return std::make_pair( ret, retStats );
             }
             default:
                 return std::make_pair( ret, Statistics() ); // TODO: meaningful DnCStatistics
             }
         } else
         {
+            unsigned timeoutInSeconds = Options::get()->getInt( Options::TIMEOUT );
             if(!engine.solve(timeoutInSeconds)) return std::make_pair(ret, *(engine.getStatistics()));
 
             if (engine.getExitCode() == Engine::SAT)
@@ -219,13 +248,76 @@ InputQuery loadQuery(std::string filename){
 // Code necessary to generate Python library
 // Describes which classes and functions are exposed to API
 PYBIND11_MODULE(MarabouCore, m) {
-    m.doc() = "Marabou API Library";
+    m.doc() = "Maraboupy bindings to the C++ Marabou via pybind11";
     m.def("createInputQuery", &createInputQuery, "Create input query from network and property file");
-    m.def("solve", &solve, "Takes in a description of the InputQuery and returns the solution", py::arg("inputQuery"), py::arg("options"), py::arg("redirect") = "");
-    m.def("saveQuery", &saveQuery, "Serializes the inputQuery in the given filename");
-    m.def("loadQuery", &loadQuery, "Loads and returns a serialized inputQuery from the given filename");
-    m.def("addReluConstraint", &addReluConstraint, "Add a Relu constraint to the InputQuery");
-    m.def("addMaxConstraint", &addMaxConstraint, "Add a Max constraint to the InputQuery");
+    m.def("solve", &solve, R"pbdoc(
+        Takes in a description of the InputQuery and returns the solution
+
+        Args:
+            inputQuery (:class:`~maraboupy.MarabouCore.InputQuery`): Marabou input query to be solved
+            options (class:`~maraboupy.MarabouCore.Options`): Object defining the options used for Marabou
+            redirect (str, optional): Filepath to direct standard output, defaults to ""
+
+        Returns:
+            (tuple): tuple containing:
+                - vals (Dict[int, float]): Empty dictionary if UNSAT, otherwise a dictionary of SATisfying values for variables
+                - stats (:class:`~maraboupy.MarabouCore.Statistics`): A Statistics object to how Marabou performed
+        )pbdoc",
+        py::arg("inputQuery"), py::arg("options"), py::arg("redirect") = "");
+    m.def("saveQuery", &saveQuery, R"pbdoc(
+        Serializes the inputQuery in the given filename
+
+        Args:
+            inputQuery (:class:`~maraboupy.MarabouCore.InputQuery`): Marabou input query to be saved
+            filename (str): Name of file to save query
+        )pbdoc",
+        py::arg("inputQuery"), py::arg("filename"));
+    m.def("loadQuery", &loadQuery, R"pbdoc(
+        Loads and returns a serialized InputQuery from the given filename
+
+        Args:
+            filename (str): Name of file to load into an InputQuery
+
+        Returns:
+            :class:`~maraboupy.MarabouCore.InputQuery`
+        )pbdoc",
+        py::arg("filename"));
+    m.def("addReluConstraint", &addReluConstraint, R"pbdoc(
+        Add a Relu constraint to the InputQuery
+
+        Args:
+            inputQuery (:class:`~maraboupy.MarabouCore.InputQuery`): Marabou input query to be solved
+            var1 (int): Input variable to Relu constraint
+            var2 (int): Output variable to Relu constraint
+        )pbdoc",
+        py::arg("inputQuery"), py::arg("var1"), py::arg("var2"));
+    m.def("addSignConstraint", &addSignConstraint, R"pbdoc(
+        Add a Sign constraint to the InputQuery
+
+        Args:
+            inputQuery (:class:`~maraboupy.MarabouCore.InputQuery`): Marabou input query to be solved
+            var1 (int): Input variable to Sign constraint
+            var2 (int): Output variable to Sign constraint
+        )pbdoc",
+          py::arg("inputQuery"), py::arg("var1"), py::arg("var2"));
+    m.def("addMaxConstraint", &addMaxConstraint, R"pbdoc(
+        Add a Max constraint to the InputQuery
+
+        Args:
+            inputQuery (:class:`~maraboupy.MarabouCore.InputQuery`): Marabou input query to be solved
+            elements (set of int): Input variables to max constraint
+            v (int): Output variable from max constraint
+        )pbdoc",
+        py::arg("inputQuery"), py::arg("elements"), py::arg("v"));
+    m.def("addAbsConstraint", &addAbsConstraint, R"pbdoc(
+        Add an Abs constraint to the InputQuery
+
+        Args:
+            inputQuery (:class:`~maraboupy.MarabouCore.InputQuery`): Marabou input query to be solved
+            b (int): Input variable
+            f (int): Output variable
+        )pbdoc",
+        py::arg("inputQuery"), py::arg("b"), py::arg("f"));
     py::class_<InputQuery>(m, "InputQuery")
         .def(py::init())
         .def("setUpperBound", &InputQuery::setUpperBound)
@@ -243,10 +335,10 @@ PYBIND11_MODULE(MarabouCore, m) {
         .def("inputVariableByIndex", &InputQuery::inputVariableByIndex)
         .def("markInputVariable", &InputQuery::markInputVariable)
         .def("markOutputVariable", &InputQuery::markOutputVariable)
-        .def("markOptimizationVariable", &InputQuery::markOptimizationVariable)
         .def("outputVariableByIndex", &InputQuery::outputVariableByIndex)
-        .def("setNetworkLevelReasoner", &InputQuery::setNetworkLevelReasoner)
+        .def("markOptimizationVariable", &InputQuery::markOptimizationVariable)
         .def("setDivideStrategy", &InputQuery::setDivideStrategy);
+
     py::class_<MarabouOptions>(m, "Options")
         .def(py::init())
         .def_readwrite("_numWorkers", &MarabouOptions::_numWorkers)
@@ -254,29 +346,24 @@ PYBIND11_MODULE(MarabouCore, m) {
         .def_readwrite("_initialDivides", &MarabouOptions::_initialDivides)
         .def_readwrite("_onlineDivides", &MarabouOptions::_onlineDivides)
         .def_readwrite("_timeoutInSeconds", &MarabouOptions::_timeoutInSeconds)
+        .def_readwrite("_perReLUTimeout", &MarabouOptions::_perReLUTimeout)
         .def_readwrite("_timeoutFactor", &MarabouOptions::_timeoutFactor)
         .def_readwrite("_verbosity", &MarabouOptions::_verbosity)
         .def_readwrite("_dnc", &MarabouOptions::_dnc)
         .def_readwrite("_optimize", &MarabouOptions::_optimize)
-        .def_readwrite("_divideStrategy", &MarabouOptions::_divideStrategy);
-    py::class_<NetworkLevelReasoner, std::unique_ptr<NetworkLevelReasoner,py::nodelete>> nlr(m, "NetworkLevelReasoner");
-    nlr.def(py::init());
-    nlr.def("setNumberOfLayers", &NetworkLevelReasoner::setNumberOfLayers);
-    nlr.def("setLayerSize", &NetworkLevelReasoner::setLayerSize);
-    nlr.def("setNeuronActivationFunction", &NetworkLevelReasoner::setNeuronActivationFunction);
-    nlr.def("setBias", &NetworkLevelReasoner::setBias);
-    nlr.def("setWeight", &NetworkLevelReasoner::setWeight);
-    nlr.def("allocateMemoryByTopology", &NetworkLevelReasoner::allocateMemoryByTopology);
-    nlr.def("setWeightedSumVariable", &NetworkLevelReasoner::setWeightedSumVariable);
-    nlr.def("setActivationResultVariable", &NetworkLevelReasoner::setActivationResultVariable);
-    py::enum_<NetworkLevelReasoner::ActivationFunction>(nlr, "ActivationFunction")
-        .value("ReLU", NetworkLevelReasoner::ActivationFunction::ReLU)
-        .value("AbsoluteValue", NetworkLevelReasoner::ActivationFunction::AbsoluteValue)
+        .def_readwrite("_divideStrategy", &MarabouOptions::_divideStrategy)
+        .def_readwrite("_sncSplittingStrategy", &MarabouOptions::_sncSplittingStrategyString);
+    py::enum_<PiecewiseLinearFunctionType>(m, "PiecewiseLinearFunctionType")
+        .value("ReLU", PiecewiseLinearFunctionType::RELU)
+        .value("AbsoluteValue", PiecewiseLinearFunctionType::ABSOLUTE_VALUE)
+        .value("Max", PiecewiseLinearFunctionType::MAX)
+        .value("Disjunction", PiecewiseLinearFunctionType::DISJUNCTION)
         .export_values();
     py::enum_<DivideStrategy>(m, "DivideStrategy")
-        .value("LargestInterval", DivideStrategy::LargestInterval)
         .value("EarliestReLU", DivideStrategy::EarliestReLU)
         .value("ReLUViolation", DivideStrategy::ReLUViolation)
+        .value("Auto", DivideStrategy::Auto)
+        .value("LargestInterval", DivideStrategy::LargestInterval)
         .value("None", DivideStrategy::None)
         .export_values();
     py::class_<Equation> eq(m, "Equation");

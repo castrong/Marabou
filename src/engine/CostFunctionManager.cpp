@@ -151,6 +151,9 @@ void CostFunctionManager::computeCoreCostFunction()
       updateLinearSolved();
     }
 
+    //printf("Linear solved: %d\n", _linearSolved);
+
+    // fill the cost function with zeros
     std::fill( _costFunction, _costFunction + _n - _m, 0.0 );
 
     // Phase I - find a feasible solution
@@ -168,11 +171,23 @@ void CostFunctionManager::computeCoreCostFunction()
       //printf("Value of opt var: %f\n", _tableau->getValue(_optimizationVariable));
       //printf("Val via basic assignment: %f\n", _tableau->getBasicAssignment( _tableau->variableToIndex(_optimizationVariable) ));
       //printf("Our opt variable is basic: %d\n", _tableau->isBasic(_optimizationVariable));
-      
+
       std::fill( _basicCosts, _basicCosts + _m, 0.0 );
-      _basicCosts[_tableau->variableToIndex(_optimizationVariable)] = -1.0;
-      computeMultipliers();
-      computeReducedCosts();
+      if (_tableau->isBasic(_optimizationVariable))
+      {
+          _basicCosts[_tableau->variableToIndex(_optimizationVariable)] = -1.0;
+          computeMultipliers();
+          computeReducedCosts();
+      }
+      // If non-basic, then it's just itself
+      else
+      {
+          // _basicCosts should be all 0 since no basics are in the equation
+          // The cost function is just given by the negative optimization variable
+          // (assuming we are trying to maximize the original variable)
+          _costFunction[_tableau->variableToIndex(_optimizationVariable)] = -1.0;
+      }
+
     }
 
     _costFunctionStatus = ICostFunctionManager::COST_FUNCTION_JUST_COMPUTED;
@@ -185,7 +200,6 @@ void CostFunctionManager::updateLinearSolved()
 
 void CostFunctionManager::adjustBasicCostAccuracy()
 {
-
     if( _optimize)
     {
       updateLinearSolved();
@@ -194,60 +208,69 @@ void CostFunctionManager::adjustBasicCostAccuracy()
     // TODO (Chris Strong): Find what changes need to be made for this to work with optimization
     // FOR NOW JUST THROW THIS TO THE GENERAL COMPUTE IT ALL FUNCTION
     // fix this eventually? only need compute 1 thing so probably can just compute every time?
-    if (_linearSolved)
-    {
-      computeCoreCostFunction();
-      return;
-    }
-
-
-    unsigned variable;
-    double assignment, lb, relaxedLb, ub, relaxedUb;
 
     bool needToRecompute = false;
-    for ( unsigned i = 0; i < _m; ++i )
+
+    // Stage II just one possible basic variable contributing to the cost.
+    if (_linearSolved && _optimize)
     {
-        variable = _tableau->basicIndexToVariable( i );
-        assignment = _tableau->getBasicAssignment( i );
+      // If our optimization variable is basic set its coefficient
+      unsigned optBasicIndex = _tableau->variableToIndex(_optimizationVariable);
+      if (_tableau->isBasic(_optimizationVariable) && _basicCosts[optBasicIndex] != -1.0)
+      {
+          _basicCosts[optBasicIndex] = -1.0;
+          needToRecompute = true;
+      }
+    }
+    else
+    {
+        unsigned variable;
+        double assignment, lb, relaxedLb, ub, relaxedUb;
 
-        if ( _basicCosts[i] < 0 )
+        for ( unsigned i = 0; i < _m; ++i )
         {
-            lb = _tableau->getLowerBound( variable );
-            relaxedLb =
-                lb -
-                ( GlobalConfiguration::BASIC_COSTS_ADDITIVE_TOLERANCE +
-                  GlobalConfiguration::BASIC_COSTS_MULTIPLICATIVE_TOLERANCE * FloatUtils::abs( lb ) );
+            variable = _tableau->basicIndexToVariable( i );
+            assignment = _tableau->getBasicAssignment( i );
 
-            // Current basic cost is negative, assignment should be too small
-            if ( assignment >= relaxedLb )
+            if ( _basicCosts[i] < 0 )
             {
-                needToRecompute = true;
-                _basicCosts[i] = 0;
-            }
-        }
-        else if ( _basicCosts[i] > 0 )
-        {
-            ub = _tableau->getUpperBound( variable );
-            relaxedUb =
-                ub +
-                ( GlobalConfiguration::BASIC_COSTS_ADDITIVE_TOLERANCE +
-                  GlobalConfiguration::BASIC_COSTS_MULTIPLICATIVE_TOLERANCE * FloatUtils::abs( ub ) );
+                lb = _tableau->getLowerBound( variable );
+                relaxedLb =
+                    lb -
+                    ( GlobalConfiguration::BASIC_COSTS_ADDITIVE_TOLERANCE +
+                      GlobalConfiguration::BASIC_COSTS_MULTIPLICATIVE_TOLERANCE * FloatUtils::abs( lb ) );
 
-            // Current basic cost is positive, assignment should be too large
-            if ( assignment <= relaxedUb )
+                // Current basic cost is negative, assignment should be too small
+                if ( assignment >= relaxedLb )
+                {
+                    needToRecompute = true;
+                    _basicCosts[i] = 0;
+                }
+            }
+            else if ( _basicCosts[i] > 0 )
             {
-                needToRecompute = true;
-                _basicCosts[i] = 0;
-            }
-        }
-        else
-        {
-            /*
-              It seems to make sense to adjust anything that had cost 0 but should be
-              1 or -1, but apparently this leads to cycling.
-            */
-        }
+                ub = _tableau->getUpperBound( variable );
+                relaxedUb =
+                    ub +
+                    ( GlobalConfiguration::BASIC_COSTS_ADDITIVE_TOLERANCE +
+                      GlobalConfiguration::BASIC_COSTS_MULTIPLICATIVE_TOLERANCE * FloatUtils::abs( ub ) );
 
+                // Current basic cost is positive, assignment should be too large
+                if ( assignment <= relaxedUb )
+                {
+                    needToRecompute = true;
+                    _basicCosts[i] = 0;
+                }
+            }
+            else
+            {
+                /*
+                  It seems to make sense to adjust anything that had cost 0 but should be
+                  1 or -1, but apparently this leads to cycling.
+                */
+            }
+
+        }
     }
 
     if ( needToRecompute )
@@ -366,6 +389,10 @@ unsigned CostFunctionManager::getOptimizationVariable()
 {
     return _optimizationVariable;
 }
+bool CostFunctionManager::getLinearSolved()
+{
+    return _linearSolved;
+}
 
 double CostFunctionManager::updateCostFunctionForPivot( unsigned enteringVariableIndex,
                                                         unsigned leavingVariableIndex,
@@ -382,11 +409,11 @@ double CostFunctionManager::updateCostFunctionForPivot( unsigned enteringVariabl
 
       // TODO (Chris Strong): Find what changes need to be made for this to work with optimization
       // FOR NOW JUST THROW THIS TO THE GENERAL COMPUTE IT ALL FUNCTION
-      if (_linearSolved)
-      {
-        computeCoreCostFunction();
-        return -1.0;
-      }      
+      // if (_linearSolved && _optimize)
+      // {
+      //   computeCoreCostFunction();
+      //   return -1.0;
+      // }
 
 
     /*
@@ -434,14 +461,36 @@ double CostFunctionManager::updateCostFunctionForPivot( unsigned enteringVariabl
             _costFunction[i] -= (*pivotRow)[i] * _costFunction[enteringVariableIndex];
     }
 
-    /*
-      The leaving variable might have contributed to the cost function, but it will
-      soon be made within bounds. So, we adjust the reduced costs accordingly.
-    */
-    _costFunction[enteringVariableIndex] -= _basicCosts[leavingVariableIndex];
+    if (!(_linearSolved && _optimize))
+    {
+        _costFunction[enteringVariableIndex] -= _basicCosts[leavingVariableIndex];
+    }
 
-    // The entering varibale is non-basic, so it is within bounds.
-    _basicCosts[leavingVariableIndex] = 0;
+    // If we're in stage II, then we can have a basic cost without an out of bounds
+    // variable, which means we won't need this extra update.
+    if (_linearSolved && _optimize)
+    {
+        // If the entering variable is the optimization variable, set the basic cost to -1.0
+        // The reduced cost should already have been updated appropriately
+        if(_tableau->nonBasicIndexToVariable(enteringVariableIndex) == _optimizationVariable)
+        {
+            _basicCosts[leavingVariableIndex] = -1.0;
+        }
+        else
+        {
+            _basicCosts[leavingVariableIndex] = 0.0;
+        }
+    }
+    else
+    {
+        /*
+          The leaving variable might have contributed to the cost function, but it will
+          soon be made within bounds. So, we adjust the reduced costs accordingly.
+        */
+        _costFunction[enteringVariableIndex] -= _basicCosts[leavingVariableIndex];
+        // The entering varibale is non-basic, so it is within bounds.
+        _basicCosts[leavingVariableIndex] = 0;
+    }
 
     _costFunctionStatus = ICostFunctionManager::COST_FUNCTION_UPDATED;
 
