@@ -1,4 +1,4 @@
-cmake_minimum_required (VERSION 3.2)
+cmake_minimum_required (VERSION 3.12)
 project(Marabou)
 
 set(CMAKE_CXX_STANDARD 11)
@@ -28,6 +28,7 @@ set(MARABOU_TEST_LIB MarabouHelperTest)
 set(MARABOU_EXE Marabou${CMAKE_EXECUTABLE_SUFFIX})
 set(MARABOU_PY MarabouCore)
 
+set(DEPS_DIR "${PROJECT_SOURCE_DIR}/deps")
 set(TOOLS_DIR "${PROJECT_SOURCE_DIR}/tools")
 set(SRC_DIR "${PROJECT_SOURCE_DIR}/src")
 set(PYTHON_API_DIR "${PROJECT_SOURCE_DIR}/maraboupy")
@@ -37,9 +38,19 @@ set(REGRESS_DIR "${PROJECT_SOURCE_DIR}/regress")
 set(ENGINE_DIR "${SRC_DIR}/engine")
 set(PYBIND11_DIR "${TOOLS_DIR}/pybind11-2.3.0")
 set(BOOST_DIR "${TOOLS_DIR}/boost_1_68_0")
-set(OPENBLAS_DIR "${TOOLS_DIR}/OpenBLAS-0.3.9")
+set(OPENBLAS_DEFAULT_DIR "${TOOLS_DIR}/OpenBLAS-0.3.9")
+if (NOT OPENBLAS_DIR)
+    set(OPENBLAS_DIR ${OPENBLAS_DEFAULT_DIR})
+endif()
 set(COMMON_DIR "${SRC_DIR}/common")
 set(BASIS_DIR "${SRC_DIR}/basis_factorization")
+set(CVC4_DIR "${DEPS_DIR}/CVC4")
+
+set(CONTEXT_DIR "${CVC4_DIR}/context")
+set(CVC4_BASE_DIR "${CVC4_DIR}/base")
+file(GLOB DEPS_CVC4_CONTEXT "${CONTEXT_DIR}/*.cpp")
+file(GLOB DEPS_CVC4_BASE "${CVC4_BASE_DIR}/*.cpp")
+include_directories(SYSTEM ${CVC4_DIR} ${CVC4_DIR}/include)
 
 set(OPENBLAS_LIB openblas)
 
@@ -69,7 +80,7 @@ ProcessorCount(CTEST_NTHREADS)
 if(CTEST_NTHREADS EQUAL 0)
   set(CTEST_NTHREADS 1)
 endif()
-
+ 
 # --------------- set build type ----------------------------
 set(BUILD_TYPES Release Debug MinSizeRel RelWithDebInfo)
 
@@ -82,7 +93,6 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 message(STATUS "Building ${CMAKE_BUILD_TYPE} build")
 
-
 #-------------------------set code coverage----------------------------------#
 # Allow coverage only in debug mode only in gcc
 if(CODE_COVERAGE AND CMAKE_CXX_COMPILER_ID MATCHES "GNU" AND CMAKE_BUILD_TYPE MATCHES Debug)
@@ -92,10 +102,11 @@ if(CODE_COVERAGE AND CMAKE_CXX_COMPILER_ID MATCHES "GNU" AND CMAKE_BUILD_TYPE MA
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage")
 endif()
 
-
 # We build a static library that is the core of the project, the link it to the
 # API's (executable and python at the moment)
-add_library(${MARABOU_LIB} ${SRCS_COMMON_REAL} ${SRCS_ENGINE_REAL})
+add_library(${MARABOU_LIB} ${DEPS_CVC4_CONTEXT} ${DEPS_CVC4_BASE} ${SRCS_COMMON_REAL} ${SRCS_ENGINE_REAL})
+target_include_directories(${MARABOU_LIB} PRIVATE SYSTEM)
+
 add_executable(${MARABOU_EXE} "${ENGINE_DIR}/main.cpp")
 set(MARABOU_EXE_PATH "${BIN_DIR}/${MARABOU_EXE}")
 add_custom_command(TARGET ${MARABOU_EXE} POST_BUILD
@@ -144,8 +155,6 @@ if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     set(CXXTEST_FLAGS ${CXXTEST_FLAGS} -Wno-terminate)
 endif()
 
-
-
 # Boost
 if (MSVC)
     set(BOOST_ROOT "${BOOST_DIR}/win_installed")
@@ -168,20 +177,20 @@ if (MSVC)
 else()
     set(SCRIPT_EXTENSION sh)
 endif()
-find_package(Boost COMPONENTS program_options)
+find_package(Boost COMPONENTS program_options timer chrono thread)
 # Find boost
 if (NOT ${Boost_FOUND})
     # bash file that downloads and install boost 1_68_0, the name need to match
     # BOOST_DIR variable
     execute_process(COMMAND ${TOOLS_DIR}/download_boost.${SCRIPT_EXTENSION})
-    find_package(Boost REQUIRED COMPONENTS program_options)
+    find_package(Boost REQUIRED COMPONENTS program_options timer chrono thread)
 endif()
 set(LIBS_INCLUDES ${Boost_INCLUDE_DIRS})
 set(LIBS ${Boost_LIBRARIES})
 
 if (${ENABLE_GUROBI})
   message(STATUS "Using Gurobi for LP relaxation for bound tightening")
-  if (NOT DEFINED GUROBI_DIR) 
+  if (NOT DEFINED GUROBI_DIR)
     set(GUROBI_DIR $ENV{GUROBI_HOME})
   endif()
   add_compile_definitions(ENABLE_GUROBI)
@@ -195,23 +204,38 @@ if (${ENABLE_GUROBI})
   target_include_directories(${GUROBI_LIB1} INTERFACE ${GUROBI_DIR}/include/)
 
   add_library(${GUROBI_LIB2} SHARED IMPORTED)
-  set_target_properties(${GUROBI_LIB2} PROPERTIES IMPORTED_LOCATION ${GUROBI_DIR}/lib/libgurobi90.so)
+
+  # MACOSx uses .dylib instead of .so for its Gurobi downloads.
+  if (APPLE)
+    set_target_properties(${GUROBI_LIB2} PROPERTIES IMPORTED_LOCATION ${GUROBI_DIR}/lib/libgurobi91.dylib)
+  else()
+    set_target_properties(${GUROBI_LIB2} PROPERTIES IMPORTED_LOCATION ${GUROBI_DIR}/lib/libgurobi91.so)
+  endif ()
+
   list(APPEND LIBS ${GUROBI_LIB2})
   target_include_directories(${GUROBI_LIB2} INTERFACE ${GUROBI_DIR}/include/)
 endif()
 
-if (${ENABLE_OPENBLAS} AND NOT MSVC)
+if (NOT MSVC)
+if (${ENABLE_OPENBLAS})
     message(STATUS "using openblas for matrix multiplication")
     add_compile_definitions(ENABLE_OPENBLAS)
     #OpenBLAS
     if(NOT EXISTS "${OPENBLAS_DIR}/installed/lib/libopenblas.a")
-        execute_process(COMMAND ${TOOLS_DIR}/download_openBLAS.sh)
+        message("Can't find open blas, installing. If open blas is isntalled please use the OPENBLAS_DIR parameter to pass the path")
+        if (${OPENBLAS_DIR} STREQUAL ${OPENBLAS_DEFAULT_DIR})
+            message("installing openblas")
+            execute_process(COMMAND ${TOOLS_DIR}/download_openBLAS.sh)
+        else()
+            message(FATAL_ERROR "Can't find openblas in the supplied directory")
+        endif()
     endif()
 
     add_library(${OPENBLAS_LIB} SHARED IMPORTED)
     set_target_properties(${OPENBLAS_LIB} PROPERTIES IMPORTED_LOCATION ${OPENBLAS_DIR}/installed/lib/libopenblas.a)
     list(APPEND LIBS ${OPENBLAS_LIB})
     target_include_directories(${OPENBLAS_LIB} INTERFACE ${OPENBLAS_DIR}/installed/include)
+endif()
 endif()
 
 # pthread
@@ -229,11 +253,9 @@ endif()
 target_include_directories(${MARABOU_LIB} PRIVATE ${LIBS_INCLUDES})
 target_compile_options(${MARABOU_LIB} PRIVATE ${RELEASE_FLAGS})
 
-
 # Build marabou executable
 target_link_libraries(${MARABOU_EXE} ${MARABOU_LIB})
 target_include_directories(${MARABOU_EXE} PRIVATE ${LIBS_INCLUDES})
-
 
 # Build Python marabou
 if (${FORCE_PYTHON_BUILD})
@@ -273,8 +295,6 @@ if (${BUILD_PYTHON})
     endif()
 endif()
 
-
-
 add_library(${MARABOU_TEST_LIB})
 set (TEST_DIR "${CMAKE_CURRENT_BINARY_DIR}/tests")
 file(MAKE_DIRECTORY ${TEST_DIR})
@@ -287,18 +307,15 @@ if(CXXTEST_FOUND)
     enable_testing()
 endif()
 
-target_link_libraries(${MARABOU_TEST_LIB} ${LIBS})
-target_include_directories(${MARABOU_TEST_LIB} PRIVATE ${LIBS_INCLUDES})
+target_link_libraries(${MARABOU_TEST_LIB} ${MARABOU_LIB} ${LIBS})
+target_include_directories(${MARABOU_TEST_LIB} PRIVATE ${LIBS_INCLUDES} )
 target_compile_options(${MARABOU_TEST_LIB} PRIVATE ${CXXTEST_FLAGS})
-
-
 
 add_custom_target(build-tests ALL)
 
 add_custom_target(check
       COMMAND ctest --output-on-failure -j${CTEST_NTHREADS} $$ARGS
       DEPENDS build-tests build_input_parsers ${MARABOU_EXE})
-
 
 # Decide which tests to run and execute
 set(TESTS_TO_RUN "")
@@ -355,6 +372,7 @@ add_subdirectory(${SRC_DIR})
 add_subdirectory(${TOOLS_DIR})
 add_subdirectory(${REGRESS_DIR})
 
+
 execute_process(
   COMMAND git rev-parse --abbrev-ref HEAD
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
@@ -374,4 +392,3 @@ set(MARABOU_VERSION 1.0.+)
 add_definitions("-DGIT_COMMIT_HASH=\"${GIT_COMMIT_HASH}\"")
 add_definitions("-DGIT_BRANCH=\"${GIT_BRANCH}\"")
 add_definitions("-DMARABOU_VERSION=\"${MARABOU_VERSION}\"")
-

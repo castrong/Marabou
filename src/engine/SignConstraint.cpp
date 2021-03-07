@@ -29,9 +29,9 @@
 SignConstraint::SignConstraint( unsigned b, unsigned f )
     : _b( b )
     , _f( f )
+    , _direction( PHASE_NOT_FIXED )
     , _haveEliminatedVariables( false )
 {
-    setPhaseStatus( PhaseStatus::PHASE_NOT_FIXED );
 }
 
 SignConstraint::SignConstraint( const String &serializedSign )
@@ -50,8 +50,6 @@ SignConstraint::SignConstraint( const String &serializedSign )
     _f = atoi( var->ascii() );
     ++var;
     _b = atoi( var->ascii() );
-
-    setPhaseStatus( PhaseStatus::PHASE_NOT_FIXED );
 }
 
 PiecewiseLinearFunctionType SignConstraint::getType() const
@@ -112,10 +110,23 @@ bool SignConstraint::satisfied() const
 
 List<PiecewiseLinearCaseSplit> SignConstraint::getCaseSplits() const
 {
-    if ( _phaseStatus != PhaseStatus::PHASE_NOT_FIXED )
+    if ( _phaseStatus != PHASE_NOT_FIXED )
         throw MarabouError( MarabouError::REQUESTED_CASE_SPLITS_FROM_FIXED_CONSTRAINT );
 
     List <PiecewiseLinearCaseSplit> splits;
+
+    if ( _direction == SIGN_PHASE_NEGATIVE )
+    {
+      splits.append( getNegativeSplit() );
+      splits.append( getPositiveSplit() );
+      return splits;
+    }
+    if ( _direction == SIGN_PHASE_POSITIVE )
+    {
+      splits.append( getPositiveSplit() );
+      splits.append( getNegativeSplit() );
+      return splits;
+    }
 
     // If we have existing knowledge about the assignment, use it to
     // influence the order of splits
@@ -162,14 +173,14 @@ PiecewiseLinearCaseSplit SignConstraint::getPositiveSplit() const
 
 bool SignConstraint::phaseFixed() const
 {
-    return _phaseStatus != PhaseStatus::PHASE_NOT_FIXED;
+    return _phaseStatus != PHASE_NOT_FIXED;
 }
 
 PiecewiseLinearCaseSplit SignConstraint::getValidCaseSplit() const
 {
-    ASSERT( _phaseStatus != PhaseStatus::PHASE_NOT_FIXED );
+    ASSERT( _phaseStatus != PHASE_NOT_FIXED );
 
-    if ( _phaseStatus == PhaseStatus::PHASE_POSITIVE )
+    if ( _phaseStatus == PhaseStatus::SIGN_PHASE_POSITIVE )
         return getPositiveSplit();
 
     return getNegativeSplit();
@@ -207,11 +218,11 @@ String SignConstraint::phaseToString( PhaseStatus phase )
         case PHASE_NOT_FIXED:
             return "PHASE_NOT_FIXED";
 
-        case PHASE_POSITIVE:
-            return "PHASE_POSITIVE";
+        case SIGN_PHASE_POSITIVE:
+            return "SIGN_PHASE_POSITIVE";
 
-        case PHASE_NEGATIVE:
-            return "PHASE_NEGATIVE";
+        case SIGN_PHASE_NEGATIVE:
+            return "SIGN_PHASE_NEGATIVE";
 
         default:
             return "UNKNOWN";
@@ -240,7 +251,7 @@ void SignConstraint::notifyLowerBound( unsigned variable, double bound )
 
     if ( variable == _f && FloatUtils::gt( bound, -1 ) )
     {
-        setPhaseStatus( PhaseStatus::PHASE_POSITIVE );
+        setPhaseStatus( PhaseStatus::SIGN_PHASE_POSITIVE );
         if ( _constraintBoundTightener )
         {
             _constraintBoundTightener->registerTighterLowerBound( _f, 1 );
@@ -249,7 +260,7 @@ void SignConstraint::notifyLowerBound( unsigned variable, double bound )
     }
     else if ( variable == _b && !FloatUtils::isNegative( bound ) )
     {
-        setPhaseStatus( PhaseStatus::PHASE_POSITIVE );
+        setPhaseStatus( PhaseStatus::SIGN_PHASE_POSITIVE );
         if ( _constraintBoundTightener )
         {
             _constraintBoundTightener->registerTighterLowerBound( _f, 1 );
@@ -271,7 +282,7 @@ void SignConstraint::notifyUpperBound( unsigned variable, double bound )
 
     if ( variable == _f && FloatUtils::lt( bound, 1 ) )
     {
-        setPhaseStatus( PhaseStatus::PHASE_NEGATIVE );
+        setPhaseStatus( PhaseStatus::SIGN_PHASE_NEGATIVE );
         if ( _constraintBoundTightener )
         {
             _constraintBoundTightener->registerTighterUpperBound( _f, -1 );
@@ -280,7 +291,7 @@ void SignConstraint::notifyUpperBound( unsigned variable, double bound )
     }
     else if ( variable == _b && FloatUtils::isNegative( bound ) )
     {
-        setPhaseStatus( PhaseStatus::PHASE_NEGATIVE );
+        setPhaseStatus( PhaseStatus::SIGN_PHASE_NEGATIVE );
         if ( _constraintBoundTightener )
         {
             _constraintBoundTightener->registerTighterUpperBound( _f, -1 );
@@ -389,26 +400,85 @@ void SignConstraint::eliminateVariable( __attribute__((unused)) unsigned variabl
 
                   if ( FloatUtils::areEqual( fixedValue, 1 ) )
                   {
-                      ASSERT( _phaseStatus != PHASE_NEGATIVE );
+                      ASSERT( _phaseStatus != SIGN_PHASE_NEGATIVE );
                   }
                   else if (FloatUtils::areEqual( fixedValue, -1 ) )
                   {
-                      ASSERT( _phaseStatus != PHASE_POSITIVE );
+                      ASSERT( _phaseStatus != SIGN_PHASE_POSITIVE );
                   }
               }
               else if ( variable == _b )
               {
                   if ( FloatUtils::gte( fixedValue, 0 ) )
                   {
-                      ASSERT( _phaseStatus != PHASE_NEGATIVE );
+                      ASSERT( _phaseStatus != SIGN_PHASE_NEGATIVE );
                   }
                   else if ( FloatUtils::lt( fixedValue, 0 ) )
                   {
-                      ASSERT( _phaseStatus != PHASE_POSITIVE );
+                      ASSERT( _phaseStatus != SIGN_PHASE_POSITIVE );
                   }
               }
         });
 
     // In a Sign constraint, if a variable is removed the entire constraint can be discarded.
     _haveEliminatedVariables = true;
+}
+
+unsigned SignConstraint::getB() const
+{
+    return _b;
+}
+
+unsigned SignConstraint::getF() const
+{
+    return _f;
+}
+
+void SignConstraint::dump( String &output ) const
+{
+    output = Stringf( "SignConstraint: x%u = Sign( x%u ). Active? %s. PhaseStatus = %u (%s). ",
+                      _f, _b,
+                      _constraintActive ? "Yes" : "No",
+                      _phaseStatus, phaseToString( _phaseStatus ).ascii()
+                      );
+
+    output += Stringf( "b in [%s, %s], ",
+                       _lowerBounds.exists( _b ) ? Stringf( "%lf", _lowerBounds[_b] ).ascii() : "-inf",
+                       _upperBounds.exists( _b ) ? Stringf( "%lf", _upperBounds[_b] ).ascii() : "inf" );
+
+    output += Stringf( "f in [%s, %s]\n",
+                       _lowerBounds.exists( _f ) ? Stringf( "%lf", _lowerBounds[_f] ).ascii() : "-inf",
+                       _upperBounds.exists( _f ) ? Stringf( "%lf", _upperBounds[_f] ).ascii() : "inf" );
+}
+
+double SignConstraint::computePolarity() const
+{
+  double currentLb = _lowerBounds[_b];
+  double currentUb = _upperBounds[_b];
+  if ( !FloatUtils::isNegative( currentLb ) ) return 1;
+  if ( FloatUtils::isNegative( currentUb ) ) return -1;
+  double width = currentUb - currentLb;
+  double sum = currentUb + currentLb;
+  return sum / width;
+}
+
+void SignConstraint::updateDirection()
+{
+    _direction = ( FloatUtils::isNegative( computePolarity() ) ) ?
+        SIGN_PHASE_NEGATIVE : SIGN_PHASE_POSITIVE;
+}
+
+PhaseStatus SignConstraint::getDirection() const
+{
+  return _direction;
+}
+
+void SignConstraint::updateScoreBasedOnPolarity()
+{
+  _score = std::abs( computePolarity() );
+}
+
+bool SignConstraint::supportPolarity() const
+{
+  return true;
 }

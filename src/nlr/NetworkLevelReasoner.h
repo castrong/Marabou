@@ -16,13 +16,16 @@
 #ifndef __NetworkLevelReasoner_h__
 #define __NetworkLevelReasoner_h__
 
+#include "DeepPolyAnalysis.h"
 #include "ITableau.h"
 #include "Layer.h"
 #include "LayerOwner.h"
 #include "Map.h"
+#include "MatrixMultiplication.h"
 #include "NeuronIndex.h"
 #include "PiecewiseLinearFunctionType.h"
 #include "Tightening.h"
+#include <memory>
 
 namespace NLR {
 
@@ -57,6 +60,7 @@ public:
 
     unsigned getNumberOfLayers() const;
     const Layer *getLayer( unsigned index ) const;
+    Layer *getLayer( unsigned index );
 
     /*
       Bind neurons in the NLR to the Tableau variables that represent them.
@@ -104,8 +108,10 @@ public:
     void obtainCurrentBounds();
     void intervalArithmeticBoundPropagation();
     void symbolicBoundPropagation();
+    void deepPolyPropagation();
     void lpRelaxationPropagation();
     void MILPPropagation();
+    void iterativePropagation();
 
     void receiveTighterBound( Tightening tightening );
     void getConstraintTightenings( List<Tightening> &tightenings );
@@ -135,6 +141,32 @@ public:
     */
     List<PiecewiseLinearConstraint *> getConstraintsInTopologicalOrder();
     void addConstraintInTopologicalOrder( PiecewiseLinearConstraint *constraint );
+    void removeConstraintFromTopologicalOrder( PiecewiseLinearConstraint *constraint );
+
+    /*
+      Generate an input query from this NLR, according to the
+      discovered network topology
+    */
+    InputQuery generateInputQuery();
+
+    /*
+      Finds logically consecutive WS layers and merges them, in order
+      to reduce the total number of layers and variables in the
+      network
+    */
+    void mergeConsecutiveWSLayers();
+
+    /*
+      Print the bounds of variables layer by layer
+    */
+    void dumpBounds();
+
+    /*
+      Get the size of the widest layer
+    */
+    unsigned getMaxLayerSize() const;
+
+    const Map<unsigned, Layer *> &getLayerIndexToLayer() const;
 
 private:
     Map<unsigned, Layer *> _layerIndexToLayer;
@@ -143,9 +175,36 @@ private:
     // Tightenings discovered by the various layers
     List<Tightening> _boundTightenings;
 
+
+    std::unique_ptr<DeepPolyAnalysis> _deepPolyAnalysis;
+
     void freeMemoryIfNeeded();
 
     List<PiecewiseLinearConstraint *> _constraintsInTopologicalOrder;
+
+    // Helper functions for generating an input query
+    void generateInputQueryForLayer( InputQuery &inputQuery, const Layer &layer );
+    void generateInputQueryForWeightedSumLayer( InputQuery &inputQuery, const Layer &layer );
+    void generateInputQueryForReluLayer( InputQuery &inputQuery, const Layer &layer );
+    void generateInputQueryForSignLayer( InputQuery &inputQuery, const Layer &layer );
+    void generateInputQueryForAbsoluteValueLayer( InputQuery &inputQuery, const Layer &layer );
+    void generateInputQueryForMaxLayer( InputQuery &inputQuery, const Layer &layer );
+
+    bool suitableForMerging( unsigned secondLayerIndex );
+    void mergeWSLayers( unsigned secondLayerIndex );
+    double *multiplyWeights( const double *firstMatrix,
+                             const double *secondMatrix,
+                             unsigned inputDimension,
+                             unsigned middleDimension,
+                             unsigned outputDimension );
+    void reduceLayerIndex( unsigned layer, unsigned startIndex );
+
+    /*
+      If the NLR is manipulated manually in order to generate a new
+      input query, this method can be used to assign variable indices
+      to all neurons in the network
+    */
+    void reindexNeurons();
 };
 
 } // namespace NLR

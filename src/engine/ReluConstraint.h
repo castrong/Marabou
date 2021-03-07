@@ -23,12 +23,6 @@
 class ReluConstraint : public PiecewiseLinearConstraint
 {
 public:
-    enum PhaseStatus {
-        PHASE_NOT_FIXED = 0,
-        PHASE_ACTIVE = 1,
-        PHASE_INACTIVE = 2,
-    };
-
     /*
       The f variable is the relu output on the b variable:
       f = relu( b )
@@ -152,27 +146,16 @@ public:
     String serializeToString() const;
 
     /*
-      Get the index of the B variable.
+      Get the index of the B and F variables.
     */
     unsigned getB() const;
     unsigned getF() const;
-
-    /*
-      Get the current phase status.
-    */
-    PhaseStatus getPhaseStatus() const;
 
     /*
       Check if the aux variable is in use and retrieve it
     */
     bool auxVariableInUse() const;
     unsigned getAux() const;
-
-    /*
-      Return true if and only if this piecewise linear constraint supports
-      symbolic bound tightening.
-    */
-    bool supportsSymbolicBoundTightening() const;
 
     bool supportPolarity() const;
 
@@ -197,11 +180,10 @@ public:
 
     PhaseStatus getDirection() const;
 
-    void updateScore();
+    void updateScoreBasedOnPolarity();
 
 private:
     unsigned _b, _f;
-    PhaseStatus _phaseStatus;
     bool _auxVarInUse;
     unsigned _aux;
 
@@ -215,11 +197,6 @@ private:
     PiecewiseLinearCaseSplit getActiveSplit() const;
 
     bool _haveEliminatedVariables;
-
-    /*
-      Set the phase status.
-    */
-    void setPhaseStatus( PhaseStatus phaseStatus );
 
     static String phaseToString( PhaseStatus phase );
 

@@ -559,9 +559,12 @@ class MarabouNetworkTF(MarabouNetwork.MarabouNetwork):
 
         # Broadcast and flatten. Assert that lengths are all the same
         input1, input2 = np.broadcast_arrays(input1, input2)
+        outputVars = self.makeNewVariables(op)
+        scalars, sgnVar, sgnScalar = self.getScalars(op, outputVars)
         input1 = input1.flatten()
         input2 = input2.flatten()
-        outputVars = self.makeNewVariables(op).flatten()
+        outputVars = outputVars.flatten()
+        scalars = scalars.flatten()
         assert len(input1) == len(input2)
         assert len(outputVars) == len(input1)
         
@@ -574,18 +577,18 @@ class MarabouNetworkTF(MarabouNetwork.MarabouNetwork):
         if input1_isVar:
             for i in range(len(outputVars)):
                 e = MarabouUtils.Equation()
-                e.addAddend(input2[i]**power, input1[i])
+                e.addAddend(sgnVar * input2[i]**power, input1[i])
                 e.addAddend(-1, outputVars[i])
-                e.setScalar(0.0)
+                e.setScalar(-sgnScalar * scalars[i])
                 self.addEquation(e)
         else:
             if power == -1.0:
                 raise RuntimeError("Dividing a constant by a variable is not allowed")
             for i in range(len(outputVars)):
                 e = MarabouUtils.Equation()
-                e.addAddend(input1[i], input2[i])
+                e.addAddend(sgnVar * input1[i], input2[i])
                 e.addAddend(-1, outputVars[i])
-                e.setScalar(0.0)
+                e.setScalar(-sgnScalar * scalars[i])
                 self.addEquation(e)
         
     def conv2DEquations(self, op):
@@ -779,7 +782,27 @@ class MarabouNetworkTF(MarabouNetwork.MarabouNetwork):
                             self.addMaxConstraint(maxVars, outputVars[n][i][j][k])
                         else:
                             self.addMaxConstraint(maxVars, outputVars[n][k][i][j])
-                    
+
+    def signEquations(self, op):
+        """Function to generate equations corresponding to pointwise sign activation
+
+        Args:
+            op: (tf.op) representing Sign operation
+
+        :meta private:
+        """
+        # Get input and output variables
+        assert len(op.inputs) == 1
+        inputVars = self.varMap[op.inputs[0].op].flatten()
+        outputVars = self.makeNewVariables(op).flatten()
+        assert len(inputVars) == len(outputVars)
+
+        # Generate sign constraints
+        for inVar, outVar in zip(inputVars, outputVars):
+            self.addSignConstraint(inVar, outVar)
+            self.setLowerBound(outVar, -1.0)
+            self.setUpperBound(outVar, 1.0)
+
     def reassignVariable(self, var, numInVars, outVars, newOutVars):
         """ Reassign variable number so output variables follow input variables
 
@@ -833,6 +856,10 @@ class MarabouNetworkTF(MarabouNetwork.MarabouNetwork):
         for i, variables in enumerate(self.reluList):
             self.reluList[i] = tuple([reassignMap[var] for var in variables])
         
+        # Adjust sign list
+        for i, variables in enumerate(self.signList):
+            self.signList[i] = tuple([reassignMap[var] for var in variables])
+
         # Adjust maxpool list
         for i, (elements, outVar) in enumerate(self.maxList):
             newOutVar = reassignMap[outVar]
@@ -850,13 +877,7 @@ class MarabouNetworkTF(MarabouNetwork.MarabouNetwork):
             newUpperBounds[reassignMap[var]] = self.upperBounds[var]
         self.lowerBounds = newLowerBounds
         self.upperBounds = newUpperBounds
-        
-        # Adjust constraint variables list
-        newVarsParticipatingInConstraints = set()
-        for var in self.varsParticipatingInConstraints:
-            newVarsParticipatingInConstraints.add(reassignMap[var])
-        self.varsParticipatingInConstraints = newVarsParticipatingInConstraints
-            
+
         # Assign output variables to the new array
         self.outputVars = newOutVars.reshape(self.outputShape)
         self.varMap[self.outputOp] = self.outputVars 
@@ -870,7 +891,7 @@ class MarabouNetworkTF(MarabouNetwork.MarabouNetwork):
         :meta private:
         """
         # These operations do not create new equations, but manipulate the output from previous equations
-        if op.node_def.op == "Identity":
+        if op.node_def.op in ["Identity", "IdentityN"]:
             self.identity(op)
         elif op.node_def.op == "Reshape":
             self.reshape(op)
@@ -878,7 +899,7 @@ class MarabouNetworkTF(MarabouNetwork.MarabouNetwork):
             self.concat(op)
         elif op.node_def.op == "Transpose":
             self.transpose(op)
-        
+
         # These operations do require new equations
         elif op.node_def.op == 'MatMul':
             self.matMulEquations(op)
@@ -886,13 +907,15 @@ class MarabouNetworkTF(MarabouNetwork.MarabouNetwork):
             self.addEquations(op)
         elif op.node_def.op in ['Mul', 'RealDiv']:
             self.mulEquations(op)
-        elif op.node_def.op == 'Conv2D':
+        elif op.node_def.op in ['Conv2D','QuantConv2D']:
             self.conv2DEquations(op)
         elif op.node_def.op == 'Relu':
             self.reluEquations(op)
+        elif op.node_def.op == 'Sign':
+            self.signEquations(op)
         elif op.node_def.op == 'MaxPool':
             self.maxpoolEquations(op)
-            
+
         # If we've recursed to find a Placeholder operation, this operation needs to be added the inputName list
         elif op.node_def.op == 'Placeholder':
             raise RuntimeError("The output %s depends on placeholder %s.\nPlease add '%s' to the inputName list." % (self.outputOp.node_def.name, op.node_def.name, op.node_def.name))

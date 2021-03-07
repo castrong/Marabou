@@ -21,6 +21,7 @@
 #include "IEngine.h"
 #include "MStringf.h"
 #include "MarabouError.h"
+#include "Options.h"
 #include "ReluConstraint.h"
 #include "SmtCore.h"
 
@@ -30,8 +31,7 @@ SmtCore::SmtCore( IEngine *engine )
     , _needToSplit( false )
     , _constraintForSplitting( NULL )
     , _stateId( 0 )
-    , _constraintViolationThreshold
-      ( GlobalConfiguration::CONSTRAINT_VIOLATION_THRESHOLD )
+    , _constraintViolationThreshold( Options::get()->getInt( Options::CONSTRAINT_VIOLATION_THRESHOLD ) )
 {
 }
 
@@ -51,6 +51,16 @@ void SmtCore::freeMemory()
     _stack.clear();
 }
 
+void SmtCore::reset()
+{
+    freeMemory();
+    _impliedValidSplitsAtRoot.clear();
+    _needToSplit = false;
+    _constraintForSplitting = NULL;
+    _stateId = 0;
+    _constraintToViolationCount.clear();
+}
+
 void SmtCore::reportViolatedConstraint( PiecewiseLinearConstraint *constraint )
 {
     if ( !_constraintToViolationCount.exists( constraint ) )
@@ -62,8 +72,7 @@ void SmtCore::reportViolatedConstraint( PiecewiseLinearConstraint *constraint )
          _constraintViolationThreshold )
     {
         _needToSplit = true;
-        if ( GlobalConfiguration::SPLITTING_HEURISTICS ==
-             DivideStrategy::ReLUViolation || !pickSplitPLConstraint() )
+        if ( !pickSplitPLConstraint() )
             // If pickSplitConstraint failed to pick one, use the native
             // relu-violation based splitting heuristic.
             _constraintForSplitting = constraint;
@@ -121,7 +130,7 @@ void SmtCore::performSplit()
     ++_stateId;
     _engine->storeState( *stateBeforeSplits, true );
 
-    StackEntry *stackEntry = new StackEntry;
+    SmtStackEntry *stackEntry = new SmtStackEntry;
     // Perform the first split: add bounds and equations
     List<PiecewiseLinearCaseSplit>::iterator split = splits.begin();
     _engine->applySplit( *split );
@@ -143,6 +152,8 @@ void SmtCore::performSplit()
         struct timespec end = TimeUtils::sampleMicro();
         _statistics->addTimeSmtCore( TimeUtils::timePassed( start, end ) );
     }
+
+    _constraintForSplitting = NULL;
 }
 
 unsigned SmtCore::getStackDepth() const
@@ -193,11 +204,11 @@ bool SmtCore::popSplit()
         throw MarabouError( MarabouError::DEBUGGING_ERROR );
     }
 
-    StackEntry *stackEntry = _stack.back();
+    SmtStackEntry *stackEntry = _stack.back();
 
     // Restore the state of the engine
     SMT_LOG( "\tRestoring engine state..." );
-    _engine->restoreState( *(stackEntry->_engineState) );
+    _engine->restoreState( *( stackEntry->_engineState ) );
     SMT_LOG( "\tRestoring engine state - DONE" );
 
     // Apply the new split and erase it from the list
@@ -325,7 +336,7 @@ bool SmtCore::splitAllowsStoredSolution( const PiecewiseLinearCaseSplit &split, 
     if ( _debuggingSolution.empty() )
         return true;
 
-    for ( const auto bound : split.getBoundTightenings() )
+    for ( const auto &bound : split.getBoundTightenings() )
     {
         unsigned variable = bound._variable;
 
@@ -357,11 +368,6 @@ bool SmtCore::splitAllowsStoredSolution( const PiecewiseLinearCaseSplit &split, 
     }
 
     return true;
-}
-
-void SmtCore::setConstraintViolationThreshold( unsigned threshold )
-{
-    _constraintViolationThreshold = threshold;
 }
 
 PiecewiseLinearConstraint *SmtCore::chooseViolatedConstraintForFixing( List<PiecewiseLinearConstraint *> &_violatedPlConstraints ) const
@@ -397,17 +403,51 @@ PiecewiseLinearConstraint *SmtCore::chooseViolatedConstraintForFixing( List<Piec
     return candidate;
 }
 
+void SmtCore::replaySmtStackEntry( SmtStackEntry *stackEntry )
+{
+    struct timespec start = TimeUtils::sampleMicro();
+
+    if ( _statistics )
+    {
+        _statistics->incNumSplits();
+        _statistics->incNumVisitedTreeStates();
+    }
+
+    // Obtain the current state of the engine
+    EngineState *stateBeforeSplits = new EngineState;
+    stateBeforeSplits->_stateId = _stateId;
+    ++_stateId;
+    _engine->storeState( *stateBeforeSplits, true );
+    stackEntry->_engineState = stateBeforeSplits;
+
+    // Apply all the splits
+    _engine->applySplit( stackEntry->_activeSplit );
+    for ( const auto &impliedSplit : stackEntry->_impliedValidSplits )
+        _engine->applySplit( impliedSplit );
+
+    _stack.append( stackEntry );
+
+    if ( _statistics )
+    {
+        _statistics->setCurrentStackDepth( getStackDepth() );
+        struct timespec end = TimeUtils::sampleMicro();
+        _statistics->addTimeSmtCore( TimeUtils::timePassed( start, end ) );
+    }
+}
+
+void SmtCore::storeSmtState( SmtState &smtState )
+{
+    smtState._impliedValidSplitsAtRoot = _impliedValidSplitsAtRoot;
+
+    for ( auto &stackEntry : _stack )
+        smtState._stack.append( stackEntry->duplicateSmtStackEntry() );
+
+    smtState._stateId = _stateId;
+}
+
 bool SmtCore::pickSplitPLConstraint()
 {
     if ( _needToSplit )
         _constraintForSplitting = _engine->pickSplitPLConstraint();
     return _constraintForSplitting != NULL;
 }
-
-//
-// Local Variables:
-// compile-command: "make -C ../.. "
-// tags-file-name: "../../TAGS"
-// c-basic-offset: 4
-// End:
-//

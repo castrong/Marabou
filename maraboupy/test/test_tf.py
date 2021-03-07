@@ -115,6 +115,15 @@ def test_sm2_fc1():
     network = Marabou.read_tf(filename, modelType = "savedModel_v2")
     evaluateNetwork(network)
 
+def test_sm2_sign():
+    """
+    Test a fully-connected neural network with sign activations, written in the
+    SavedModel format created by tensorflow version 2.X
+    """
+    filename = os.path.join(os.path.dirname(__file__), SM2_FOLDER, "signNetwork")
+    network = Marabou.read_tf(filename, modelType = "savedModel_v2")
+    evaluateNetwork(network)
+
 def test_sub_concat():
     """
     Test a fully-connected neural network
@@ -137,7 +146,6 @@ def test_sub_concat():
     assert len(network.inputVars) == 1
     # All output variables come from a ReLU activation, so they should be a part of a PL constraint,
     # and they should have a lower bound
-    assert np.all([network.participatesInPLConstraint(var) for var in network.outputVars.flatten()])
     assert np.all([network.lowerBoundExists(var) for var in network.outputVars.flatten()])
     evaluateNetwork(network)
     # Evaluation does not add permanent upper/lower bound values to the network

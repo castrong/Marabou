@@ -220,13 +220,14 @@ InputQuery QueryLoader::loadQuery( const String &fileName )
         }
         else
         {
-            throw MarabouError( MarabouError::UNSUPPORTED_PIECEWISE_CONSTRAINT, Stringf( "Unsupported piecewise constraint: %s\n", coType.ascii() ).ascii() );
+            throw MarabouError( MarabouError::UNSUPPORTED_PIECEWISE_LINEAR_CONSTRAINT, Stringf( "Unsupported piecewise constraint: %s\n", coType.ascii() ).ascii() );
         }
 
         ASSERT( constraint );
         inputQuery.addPiecewiseLinearConstraint( constraint );
     }
 
+    inputQuery.constructNetworkLevelReasoner();
     return inputQuery;
 }
 

@@ -108,6 +108,9 @@ public:
     // Reset the underlying model
     void reset();
 
+    // Clear the underlying model and create a fresh model
+    void resetModel();
+
     // Dump the model to a file. Note that the suffix of the file is
     // used by Gurobi to determine the format. Using ".lp" is a good
     // default
@@ -117,10 +120,14 @@ private:
     GRBEnv *_environment;
     GRBModel *_model;
     Map<String, GRBVar *> _nameToVariable;
+    double _timeoutInSeconds;
 
     void addConstraint( const List<Term> &terms, double scalar, char sense );
 
+    void freeModelIfNeeded();
     void freeMemoryIfNeeded();
+
+    static void log( const String &message );
 };
 
 #else
@@ -161,6 +168,7 @@ public:
     void solve() {}
     void extractSolution( Map<String, double> &, double & ) {}
     void reset() {}
+    void resetModel() {}
     bool optimal() { return true; }
     bool cutoffOccurred() { return false; };
     bool infeasbile() { return false; };
@@ -169,6 +177,7 @@ public:
     void setTimeLimit( double ) {};
     double getObjectiveBound() { return 0; };
     void dump() {}
+    static void log( const String & );
 };
 
 #endif // ENABLE_GUROBI

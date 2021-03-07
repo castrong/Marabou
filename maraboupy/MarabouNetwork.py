@@ -28,7 +28,7 @@ class MarabouNetwork:
         reluList (list of tuples): List of relu constraint tuples, where each tuple contains the backward and forward variables
         maxList (list of tuples): List of max constraint tuples, where each tuple conatins the set of input variables and output variable
         absList (list of tuples): List of abs constraint tuples, where each tuple conatins the input variable and the output variable
-        varsParticipatingInConstraints (set of int): Variables involved in some constraint
+        signList (list of tuples): List of sign constraint tuples, where each tuple conatins the input variable and the output variable
         lowerBounds (Dict[int, float]): Lower bounds of variables
         upperBounds (Dict[int, float]): Upper bounds of variables
         inputVars (list of numpy arrays): Input variables
@@ -47,7 +47,8 @@ class MarabouNetwork:
         self.reluList = []
         self.maxList = []
         self.absList = []
-        self.varsParticipatingInConstraints = set()
+        self.signList = []
+        self.disjunctionList = []
         self.lowerBounds = dict()
         self.upperBounds = dict()
         self.inputVars = []
@@ -98,8 +99,6 @@ class MarabouNetwork:
             v2 (int): Variable representing output of Relu
         """
         self.reluList += [(v1, v2)]
-        self.varsParticipatingInConstraints.add(v1)
-        self.varsParticipatingInConstraints.add(v2)
 
     def addMaxConstraint(self, elements, v):
         """Function to add a new Max constraint
@@ -109,9 +108,6 @@ class MarabouNetwork:
             v (int): Variable representing output of max constraint
         """
         self.maxList += [(elements, v)]
-        self.varsParticipatingInConstraints.add(v)
-        for i in elements:
-            self.varsParticipatingInConstraints.add(i)
 
     def addAbsConstraint(self, b, f):
         """Function to add a new Abs constraint
@@ -121,8 +117,23 @@ class MarabouNetwork:
             f (int): Variable representing output of the Abs constraint
         """
         self.absList += [(b, f)]
-        self.varsParticipatingInConstraints.add(b)
-        self.varsParticipatingInConstraints.add(f)
+
+    def addSignConstraint(self, b, f):
+        """Function to add a new Sign constraint
+
+        Args:
+            b (int): Variable representing input of Sign
+            f (int): Variable representing output of Sign
+        """
+        self.signList += [(b, f)]
+
+    def addDisjunctionConstraint(self, disjuncts):
+        """Function to add a new Disjunction constraint
+
+        Args:
+            disjuncts (list of list of Equations): Each inner list represents a disjunct
+        """
+        self.disjunctionList.append(disjuncts)
 
     def lowerBoundExists(self, x):
         """Function to check whether lower bound for a variable is known
@@ -139,15 +150,6 @@ class MarabouNetwork:
             x (int): Variable to check
         """
         return x in self.upperBounds
-
-    def participatesInPLConstraint(self, x):
-        """Function to check whether variable participates in any piecewise linear constraint in this network
-
-        Args:
-            x (int): Variable to check
-        """
-        # ReLUs
-        return x in self.varsParticipatingInConstraints
 
     def addEquality(self, vars, coeffs, scalar):
         """Function to add equality constraint to network
@@ -225,6 +227,12 @@ class MarabouNetwork:
 
         for b, f in self.absList:
             MarabouCore.addAbsConstraint(ipq, b, f)
+
+        for b, f in self.signList:
+            MarabouCore.addSignConstraint(ipq, b, f)
+
+        for disjunction in self.disjunctionList:
+            MarabouCore.addDisjunctionConstraint(ipq, disjunction)
 
         for l in self.lowerBounds:
             assert l < self.numVars

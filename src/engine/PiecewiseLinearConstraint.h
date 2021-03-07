@@ -31,6 +31,19 @@ class ITableau;
 class InputQuery;
 class String;
 
+enum PhaseStatus : unsigned {
+    PHASE_NOT_FIXED = 0,
+    RELU_PHASE_ACTIVE = 1,
+    RELU_PHASE_INACTIVE = 2,
+    ABS_PHASE_POSITIVE = 3,
+    ABS_PHASE_NEGATIVE = 4,
+    SIGN_PHASE_POSITIVE = 5,
+    SIGN_PHASE_NEGATIVE = 6,
+
+    // SENTINEL VALUE
+    CONSTRAINT_INFEASIBLE = 65535
+};
+
 class PiecewiseLinearConstraint : public ITableau::VariableWatcher
 {
 public:
@@ -207,15 +220,6 @@ public:
 
     /*
       Return true if and only if this piecewise linear constraint supports
-      symbolic bound tightening.
-    */
-    virtual bool supportsSymbolicBoundTightening() const
-    {
-        return false;
-    }
-
-    /*
-      Return true if and only if this piecewise linear constraint supports
       the polarity metric
     */
     virtual bool supportPolarity() const
@@ -230,7 +234,13 @@ public:
     {
     }
 
-    virtual void updateScore()
+    double getScore() const
+    {
+        return _score;
+    }
+
+
+    virtual void updateScoreBasedOnPolarity()
     {
     }
 
@@ -257,7 +267,8 @@ public:
 
 protected:
     bool _constraintActive;
-	Map<unsigned, double> _assignment;
+    PhaseStatus _phaseStatus;
+    Map<unsigned, double> _assignment;
     Map<unsigned, double> _lowerBounds;
     Map<unsigned, double> _upperBounds;
 
@@ -274,6 +285,20 @@ protected:
       Statistics collection
     */
     Statistics *_statistics;
+
+    /*
+      Set the phase status of the constraint. Uses the global PhaseStatus
+      enumeration and is initialized to PHASE_NOT_FIXED for all constraints.
+     */
+    void setPhaseStatus( PhaseStatus phase )
+    {
+        _phaseStatus = phase;
+    };
+
+    PhaseStatus getPhaseStatus() const
+    {
+        return _phaseStatus;
+    };
 };
 
 #endif // __PiecewiseLinearConstraint_h__

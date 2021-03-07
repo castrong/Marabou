@@ -16,9 +16,14 @@
 #ifndef __Options_h__
 #define __Options_h__
 
+#include "DivideStrategy.h"
 #include "MString.h"
 #include "Map.h"
+#include "MILPSolverBoundTighteningType.h"
 #include "OptionParser.h"
+#include "SnCDivideStrategy.h"
+#include "SymbolicBoundTighteningType.h"
+
 #include "boost/program_options.hpp"
 
 /*
@@ -34,11 +39,20 @@ public:
         // Should DNC mode be on or off
         DNC_MODE,
 
+        // Restore tree states of the parent when handling children in DnC.
+        RESTORE_TREE_STATES,
+
+        // Dump the bounds of each variable after preprocessing
+        DUMP_BOUNDS,
+
         // Help flag
         HELP,
 
         // Version flag
         VERSION,
+
+        // Solve the input query with a MILP solver
+        SOLVE_WITH_MILP
     };
 
     enum IntOptions {
@@ -54,12 +68,18 @@ public:
         // Global timeout
         TIMEOUT,
 
-        SPLIT_THRESHOLD,
+        CONSTRAINT_VIOLATION_THRESHOLD,
     };
 
     enum FloatOptions{
         // DNC options
         TIMEOUT_FACTOR,
+
+        // Gurobi options
+        MILP_SOLVER_TIMEOUT,
+
+        // Engine's Preprocessor options
+        PREPROCESSOR_BOUND_TOLERANCE,
     };
 
     enum StringOptions {
@@ -67,6 +87,10 @@ public:
         PROPERTY_FILE_PATH,
         INPUT_QUERY_FILE_PATH,
         SUMMARY_FILE,
+        SPLITTING_STRATEGY,
+        SNC_SPLITTING_STRATEGY,
+        SYMBOLIC_BOUND_TIGHTENING_TYPE,
+        MILP_SOLVER_BOUND_TIGHTENING_TYPE,
         QUERY_DUMP_FILE,
     };
 
@@ -81,12 +105,29 @@ public:
     void parseOptions( int argc, char **argv );
 
     /*
+      Print all command arguments
+    */
+    void printHelpMessage() const;
+
+    /*
       Retrieve the value of the various options, by type
     */
     bool getBool( unsigned option ) const;
     int getInt( unsigned option ) const;
     float getFloat( unsigned option ) const;
     String getString( unsigned option ) const;
+    DivideStrategy getDivideStrategy() const;
+    SnCDivideStrategy getSnCDivideStrategy() const;
+    SymbolicBoundTighteningType getSymbolicBoundTighteningType() const;
+    MILPSolverBoundTighteningType getMILPSolverBoundTighteningType() const;
+
+    /*
+      Retrieve the value of the various options, by type
+    */
+    void setBool( unsigned option, bool );
+    void setInt( unsigned option, int );
+    void setFloat( unsigned option, float );
+    void setString( unsigned option, std::string );
 
     /*
       Options that are determined at compile time

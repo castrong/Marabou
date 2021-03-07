@@ -22,12 +22,6 @@ class AbsoluteValueConstraint : public PiecewiseLinearConstraint
 {
 
 public:
-    enum PhaseStatus {
-        PHASE_NOT_FIXED = 0,
-        PHASE_POSITIVE = 1,
-        PHASE_NEGATIVE = 2,
-    };
-
     /*
       The f variable is the absolute value of the b variable:
       f = | b |
@@ -133,23 +127,19 @@ public:
     void dump( String &output ) const;
 
     /*
-      For preprocessing: get any auxiliary equations that this
-      constraint would like to add to the equation pool. In the ReLU
-      case, this is an equation of the form aux = f - b, where aux is
-      non-negative.
+      For preprocessing: get any auxiliary equations that this constraint would
+      like to add to the equation pool.
     */
-    void getAuxiliaryEquations( List<Equation> &newEquations ) const;
+    void addAuxiliaryEquations( InputQuery &inputQuery );
 
     /*
       Returns string with shape: absoluteValue,_f,_b
      */
     String serializeToString() const;
 
-    /*
-      Return true if and only if this piecewise linear constraint supports
-      symbolic bound tightening.
-    */
-    bool supportsSymbolicBoundTightening() const;
+    inline unsigned getB() const { return _b; };
+
+    inline unsigned getF() const { return _f; };
 
 private:
     /*
@@ -158,16 +148,15 @@ private:
     unsigned _b, _f;
 
     /*
+      Auxiliary variables
+    */
+    unsigned _posAux, _negAux;
+    bool _auxVarsInUse;
+
+    /*
       True iff _b or _f have been eliminated.
     */
     bool _haveEliminatedVariables;
-
-    /*
-      The phase status of this constraint: positive, negative, or not
-      yet fixed.
-    */
-    PhaseStatus _phaseStatus;
-    void setPhaseStatus( PhaseStatus phaseStatus );
 
     static String phaseToString( PhaseStatus phase );
 
